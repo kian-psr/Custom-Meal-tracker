@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  background: #f8f5f0;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(209, 100, 55, 0.22), transparent 28%),
+    radial-gradient(circle at top right, rgba(111, 143, 97, 0.18), transparent 25%),
+    linear-gradient(180deg, #fcfaf6 0%, #f2ede4 100%);
+  color: #1d1009;
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+}
+
+::selection {
+  background: rgba(154, 95, 54, 0.18);
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply rounded-[28px] border border-white/70 bg-white/80 shadow-panel backdrop-blur;
+  }
+
+  .animate-rise {
+    animation: rise 0.45s ease both;
+  }
+
+  .section-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.26em] text-sage-600;
+  }
+}
+

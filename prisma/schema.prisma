@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+model MealLog {
+  id                      String   @id @default(cuid())
+  mealType                MealType
+  description             String
+  mealName                String
+  photoUrl                String?
+  sourceImageName         String?
+  estimatedCalories       Int
+  proteinG                Float
+  carbsG                  Float
+  fatG                    Float
+  confidenceScore         Float
+  confidenceLabel         String
+  assumptionsJson         String
+  estimatedComponentsJson String
+  analysisSource          String   @default("openai")
+  analysisModel           String   @default("gpt-4.1")
+  consumedAt              DateTime @default(now())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([consumedAt])
+}
+
+model UserSettings {
+  id              String   @id
+  dailyCalories   Int
+  proteinTargetG  Float
+  carbTargetMinG  Float
+  carbTargetMaxG  Float
+  fatTargetMinG   Float
+  fatTargetMaxG   Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
