@@ -36,6 +36,24 @@ export type AuthSessionResponse = {
   user: AuthUser | null;
 };
 
+export type AdminUserSummary = {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: string;
+  mealCount: number;
+  lastActivityAt: string;
+};
+
+export type AdminUsersResponse = {
+  summary: {
+    signedUpUsers: number;
+    totalMeals: number;
+    activeLast7Days: number;
+  };
+  users: AdminUserSummary[];
+};
+
 export type UserSettingsRecord = {
   id: string;
   targets: DailyTargets;
