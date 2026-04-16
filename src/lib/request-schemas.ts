@@ -11,6 +11,29 @@ const isoDateTimeSchema = z
   .trim()
   .refine((value) => !Number.isNaN(new Date(value).getTime()), "Invalid date/time.");
 
+export const authEmailSchema = z
+  .string()
+  .trim()
+  .email("Enter a valid email address.")
+  .max(120)
+  .transform((value) => value.toLowerCase());
+
+export const authPasswordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters.")
+  .max(120, "Password must be 120 characters or less.");
+
+export const signUpSchema = z.object({
+  name: z.string().trim().min(1).max(60).optional().or(z.literal("")),
+  email: authEmailSchema,
+  password: authPasswordSchema,
+});
+
+export const signInSchema = z.object({
+  email: authEmailSchema,
+  password: authPasswordSchema,
+});
+
 export const createMealLogSchema = z.object({
   description: z.string().trim().min(2).max(300),
   mealType: mealTypeSchema,

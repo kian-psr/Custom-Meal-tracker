@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOST="${HOSTNAME:-0.0.0.0}"
+HOST="${HOST:-0.0.0.0}"
 PORT_VALUE="${PORT:-3000}"
 
 if [[ -n "${RAILWAY_VOLUME_MOUNT_PATH:-}" ]]; then

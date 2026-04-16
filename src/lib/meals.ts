@@ -50,8 +50,8 @@ function mapMealLogRecord(record: MealLog): MealLogRecord {
   };
 }
 
-export async function getDailyDashboard(dateKey?: string): Promise<DailyDashboard> {
-  const settings = await getOrCreateUserSettings();
+export async function getDailyDashboard(userId: string, dateKey?: string): Promise<DailyDashboard> {
+  const settings = await getOrCreateUserSettings(userId);
   const targets = settings.targets;
   const range = getDayRange(dateKey);
   const historyKeys = listDateKeysEndingAt(range.key, 7);
@@ -59,6 +59,7 @@ export async function getDailyDashboard(dateKey?: string): Promise<DailyDashboar
 
   const records = await prisma.mealLog.findMany({
     where: {
+      userId,
       consumedAt: {
         gte: historyStart,
         lt: range.end,
@@ -110,6 +111,7 @@ export async function getDailyDashboard(dateKey?: string): Promise<DailyDashboar
 }
 
 export async function createMealLog(input: {
+  userId: string;
   description: string;
   mealType: MealType;
   analysis: AnalyzedMeal;
@@ -121,6 +123,7 @@ export async function createMealLog(input: {
 }) {
   const createdRecord = await prisma.mealLog.create({
     data: {
+      userId: input.userId,
       mealType: input.mealType,
       description: input.description,
       mealName: input.analysis.mealName,
@@ -144,6 +147,7 @@ export async function createMealLog(input: {
 }
 
 export async function updateMealLog(
+  userId: string,
   id: string,
   input: {
     mealName: string;
@@ -157,8 +161,8 @@ export async function updateMealLog(
     consumedAt: string;
   }
 ) {
-  const existing = await prisma.mealLog.findUnique({
-    where: { id },
+  const existing = await prisma.mealLog.findFirst({
+    where: { id, userId },
   });
 
   if (!existing) {
@@ -183,9 +187,9 @@ export async function updateMealLog(
   return mapMealLogRecord(updatedRecord);
 }
 
-export async function deleteMealLog(id: string) {
-  const existing = await prisma.mealLog.findUnique({
-    where: { id },
+export async function deleteMealLog(userId: string, id: string) {
+  const existing = await prisma.mealLog.findFirst({
+    where: { id, userId },
     select: { id: true, photoUrl: true },
   });
 
@@ -200,4 +204,18 @@ export async function deleteMealLog(id: string) {
   await deleteMealPhoto(existing.photoUrl);
 
   return true;
+}
+
+export async function canUserAccessMealPhoto(userId: string, fileName: string) {
+  const record = await prisma.mealLog.findFirst({
+    where: {
+      userId,
+      photoUrl: `/api/photos/${fileName}`,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return Boolean(record);
 }

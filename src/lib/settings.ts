@@ -1,7 +1,7 @@
 import type { UserSettings } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_SETTINGS_ID, DEFAULT_DAILY_TARGETS } from "@/lib/targets";
+import { DEFAULT_DAILY_TARGETS } from "@/lib/targets";
 import type { DailyTargets, UserSettingsRecord } from "@/lib/types";
 
 function mapTargets(record: UserSettings): DailyTargets {
@@ -28,12 +28,12 @@ function mapSettingsRecord(record: UserSettings): UserSettingsRecord {
   };
 }
 
-export async function getOrCreateUserSettings(): Promise<UserSettingsRecord> {
+export async function getOrCreateUserSettings(userId: string): Promise<UserSettingsRecord> {
   const record = await prisma.userSettings.upsert({
-    where: { id: DEFAULT_SETTINGS_ID },
+    where: { userId },
     update: {},
     create: {
-      id: DEFAULT_SETTINGS_ID,
+      userId,
       dailyCalories: DEFAULT_DAILY_TARGETS.calories,
       proteinTargetG: DEFAULT_DAILY_TARGETS.proteinG,
       carbTargetMinG: DEFAULT_DAILY_TARGETS.carbsG.min,
@@ -46,9 +46,12 @@ export async function getOrCreateUserSettings(): Promise<UserSettingsRecord> {
   return mapSettingsRecord(record);
 }
 
-export async function updateUserSettings(targets: DailyTargets): Promise<UserSettingsRecord> {
+export async function updateUserSettings(
+  userId: string,
+  targets: DailyTargets
+): Promise<UserSettingsRecord> {
   const record = await prisma.userSettings.upsert({
-    where: { id: DEFAULT_SETTINGS_ID },
+    where: { userId },
     update: {
       dailyCalories: targets.calories,
       proteinTargetG: targets.proteinG,
@@ -58,7 +61,7 @@ export async function updateUserSettings(targets: DailyTargets): Promise<UserSet
       fatTargetMaxG: targets.fatG.max,
     },
     create: {
-      id: DEFAULT_SETTINGS_ID,
+      userId,
       dailyCalories: targets.calories,
       proteinTargetG: targets.proteinG,
       carbTargetMinG: targets.carbsG.min,

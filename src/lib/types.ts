@@ -24,6 +24,18 @@ export type DailyTargets = {
   fatG: MacroRange;
 };
 
+export type AuthUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: string;
+};
+
+export type AuthSessionResponse = {
+  authenticated: boolean;
+  user: AuthUser | null;
+};
+
 export type UserSettingsRecord = {
   id: string;
   targets: DailyTargets;

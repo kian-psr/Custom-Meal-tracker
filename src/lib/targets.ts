@@ -1,5 +1,3 @@
-export const DEFAULT_SETTINGS_ID = "default";
-
 export const DEFAULT_DAILY_TARGETS = {
   calories: 1700,
   proteinG: 180,

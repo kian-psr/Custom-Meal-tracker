@@ -1,5 +1,6 @@
 import { ZodError } from "zod";
 
+import { getAuthenticatedSession } from "@/lib/auth";
 import { saveMealPhoto } from "@/lib/file-storage";
 import { createMealLog, getDailyDashboard } from "@/lib/meals";
 import { createMealLogSchema } from "@/lib/request-schemas";
@@ -52,6 +53,12 @@ async function parseCreatePayload(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const session = await getAuthenticatedSession(request);
+
+    if (!session) {
+      return Response.json({ error: "Sign in to load your dashboard." }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date") ?? undefined;
 
@@ -62,7 +69,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const dashboard = await getDailyDashboard(date);
+    const dashboard = await getDailyDashboard(session.user.id, date);
     return Response.json(dashboard);
   } catch (error) {
     console.error(error);
@@ -75,8 +82,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await getAuthenticatedSession(request);
+
+    if (!session) {
+      return Response.json({ error: "Sign in to save meals." }, { status: 401 });
+    }
+
     const payload = await parseCreatePayload(request);
-    const meal = await createMealLog(payload);
+    const meal = await createMealLog({
+      ...payload,
+      userId: session.user.id,
+    });
 
     return Response.json({ meal }, { status: 201 });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { ZodError } from "zod";
 
+import { getAuthenticatedSession } from "@/lib/auth";
 import { deleteMealLog, updateMealLog } from "@/lib/meals";
 import { updateMealLogSchema } from "@/lib/request-schemas";
 
@@ -13,10 +14,16 @@ export const runtime = "nodejs";
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
+    const session = await getAuthenticatedSession(request);
+
+    if (!session) {
+      return Response.json({ error: "Sign in to update meals." }, { status: 401 });
+    }
+
     const { id } = await context.params;
     const json = await request.json();
     const payload = updateMealLogSchema.parse(json);
-    const updated = await updateMealLog(id, payload);
+    const updated = await updateMealLog(session.user.id, id, payload);
 
     if (!updated) {
       return Response.json({ error: "Meal not found." }, { status: 404 });
@@ -39,10 +46,16 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
+    const session = await getAuthenticatedSession(request);
+
+    if (!session) {
+      return Response.json({ error: "Sign in to delete meals." }, { status: 401 });
+    }
+
     const { id } = await context.params;
-    const deleted = await deleteMealLog(id);
+    const deleted = await deleteMealLog(session.user.id, id);
 
     if (!deleted) {
       return Response.json({ error: "Meal not found." }, { status: 404 });
@@ -57,4 +70,3 @@ export async function DELETE(_request: Request, context: RouteContext) {
     );
   }
 }
-

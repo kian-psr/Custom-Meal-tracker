@@ -5,9 +5,10 @@ A local-first meal tracking app for cutting that uses a meal photo plus a short 
 ## What This Version Includes
 
 - Meal analysis from photo + short text description
+- Email/password accounts with private per-user dashboards
 - Structured macro estimate with confidence and assumptions
 - Editable review step before saving
-- Stored meal photos
+- Stored meal photos with private access per signed-in user
 - Daily log with edit and delete support
 - Saved custom targets in the database
 - Date navigation for past days
@@ -31,6 +32,7 @@ Example values:
 
 ```bash
 DATABASE_URL="file:./dev.db"
+AUTH_SECRET="replace-with-a-random-32-plus-character-secret"
 OPENAI_API_KEY=""
 OPENAI_MEAL_MODEL="gpt-4.1"
 MOCK_OPENAI_ANALYSIS="true"
@@ -85,6 +87,13 @@ This workspace also includes a local helper wrapper:
 http://localhost:3000
 ```
 
+The seed creates a demo account you can sign into locally:
+
+```text
+Email: demo@mealtracker.local
+Password: DemoTracker123!
+```
+
 ## Production Run
 
 For a local production-style run:
@@ -98,7 +107,7 @@ The production start script now:
 
 - runs `prisma db push`
 - creates Railway volume directories when needed
-- starts Next.js on `HOSTNAME` and `PORT`
+- starts Next.js on `HOST` and `PORT`
 
 ## Railway Deployment
 
@@ -118,6 +127,7 @@ Set these in the Railway service:
 
 ```bash
 DATABASE_URL=file:/data/dev.db
+AUTH_SECRET=use-a-long-random-secret-here
 OPENAI_API_KEY=your_real_key
 OPENAI_MEAL_MODEL=gpt-4.1
 MOCK_OPENAI_ANALYSIS=false
@@ -147,6 +157,8 @@ when Railway provides a mounted volume path.
 6. Generate a public domain in Railway Networking.
 
 The app uses `npm start`, which runs the production startup script and syncs the SQLite schema against the mounted volume before serving traffic.
+
+After you redeploy, each person must create their own account from the shared Railway URL. Meals, targets, and stored photos are then filtered to the signed-in user.
 
 ## Scripts
 
@@ -188,13 +200,21 @@ The app uses `npm start`, which runs the production startup script and syncs the
 - Saved meal photos are written to `.data/meal-photos` locally
 - On Railway they default to `$RAILWAY_VOLUME_MOUNT_PATH/meal-photos`
 - They are served through `/api/photos/[fileName]`
+- Photo routes now require the signed-in user to own the related meal log
 - This works in both dev and production mode
 
 ### Targets
 
-- Saved targets are stored in the `UserSettings` table
+- Saved targets are stored per user in the `UserSettings` table
 - The frontend can update them from the dashboard
 - The analysis route reads the current saved targets for prompt context
+
+### Accounts
+
+- Sign up and sign in use email/password credentials
+- Sessions are stored with secure HttpOnly cookies
+- Each `MealLog`, `UserSettings`, and saved meal photo belongs to one user
+- Older global rows without a user stay hidden and do not appear in signed-in dashboards
 
 ## Files To Know
 

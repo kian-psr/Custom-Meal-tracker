@@ -14,8 +14,32 @@ enum MealType {
   SNACK
 }
 
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  passwordHash String
+  settings     UserSettings?
+  sessions     Session[]
+  meals        MealLog[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
 model MealLog {
   id                      String   @id @default(cuid())
+  userId                  String?
   mealType                MealType
   description             String
   mealName                String
@@ -34,12 +58,15 @@ model MealLog {
   consumedAt              DateTime @default(now())
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+  user                    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([consumedAt])
+  @@index([userId, consumedAt])
 }
 
 model UserSettings {
-  id              String   @id
+  id              String   @id @default(cuid())
+  userId          String?  @unique
   dailyCalories   Int
   proteinTargetG  Float
   carbTargetMinG  Float
@@ -48,4 +75,5 @@ model UserSettings {
   fatTargetMaxG   Float
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -1,5 +1,6 @@
 import { ZodError } from "zod";
 
+import { getAuthenticatedSession } from "@/lib/auth";
 import { analyzeMeal } from "@/lib/meal-analysis";
 import { mealTypeSchema } from "@/lib/meal-analysis-schema";
 import { getOrCreateUserSettings } from "@/lib/settings";
@@ -11,6 +12,12 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    const session = await getAuthenticatedSession(request);
+
+    if (!session) {
+      return Response.json({ error: "Sign in to analyze meals." }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const description = String(formData.get("description") ?? "").trim();
     const mealType = mealTypeSchema.parse(String(formData.get("mealType") ?? "").trim());
@@ -46,7 +53,7 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await image.arrayBuffer());
     const imageDataUrl = `data:${image.type};base64,${buffer.toString("base64")}`;
-    const settings = await getOrCreateUserSettings();
+    const settings = await getOrCreateUserSettings(session.user.id);
     const analysis = await analyzeMeal({
       imageDataUrl,
       description,

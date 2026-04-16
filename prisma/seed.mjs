@@ -1,13 +1,40 @@
+import { scryptSync } from "node:crypto";
+
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const DEMO_EMAIL = "demo@mealtracker.local";
+const DEMO_PASSWORD = "DemoTracker123!";
+
+function buildSeedPasswordHash(password) {
+  const salt = "meal-tracker-demo-seed";
+  return `${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
+}
+
 async function main() {
+  const demoUser = await prisma.user.upsert({
+    where: {
+      email: DEMO_EMAIL,
+    },
+    update: {
+      name: "Demo User",
+      passwordHash: buildSeedPasswordHash(DEMO_PASSWORD),
+    },
+    create: {
+      email: DEMO_EMAIL,
+      name: "Demo User",
+      passwordHash: buildSeedPasswordHash(DEMO_PASSWORD),
+    },
+  });
+
   await prisma.userSettings.upsert({
-    where: { id: "default" },
+    where: {
+      userId: demoUser.id,
+    },
     update: {},
     create: {
-      id: "default",
+      userId: demoUser.id,
       dailyCalories: 1700,
       proteinTargetG: 180,
       carbTargetMinG: 70,
@@ -17,7 +44,11 @@ async function main() {
     },
   });
 
-  const existingCount = await prisma.mealLog.count();
+  const existingCount = await prisma.mealLog.count({
+    where: {
+      userId: demoUser.id,
+    },
+  });
 
   if (existingCount > 0) {
     return;
@@ -28,18 +59,19 @@ async function main() {
   const breakfastAssumptions = [
     "Assumed 250 g nonfat Greek yogurt with 40 g oats.",
     "Used a medium banana and a small handful of berries.",
-    "No added honey or nut butter was included."
+    "No added honey or nut butter was included.",
   ];
 
   const lunchAssumptions = [
     "Assumed 180 g cooked chicken breast.",
     "Assumed 150 g cooked rice and 1 tsp olive oil.",
-    "Vegetables were treated as lightly cooked with minimal sauce."
+    "Vegetables were treated as lightly cooked with minimal sauce.",
   ];
 
   await prisma.mealLog.createMany({
     data: [
       {
+        userId: demoUser.id,
         mealType: "BREAKFAST",
         description: "Greek yogurt, oats, banana, berries",
         mealName: "Greek Yogurt Oat Bowl",
@@ -58,7 +90,7 @@ async function main() {
             proteinG: 26,
             carbsG: 10,
             fatG: 0,
-            notes: "Nonfat plain yogurt."
+            notes: "Nonfat plain yogurt.",
           },
           {
             name: "Oats",
@@ -67,7 +99,7 @@ async function main() {
             proteinG: 5,
             carbsG: 27,
             fatG: 3,
-            notes: "Dry rolled oats."
+            notes: "Dry rolled oats.",
           },
           {
             name: "Banana and berries",
@@ -76,14 +108,15 @@ async function main() {
             proteinG: 3,
             carbsG: 17,
             fatG: 4,
-            notes: "Fruit estimate rounded."
-          }
+            notes: "Fruit estimate rounded.",
+          },
         ]),
         analysisSource: "seed",
         analysisModel: "seed-data",
         consumedAt: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 15, 0),
       },
       {
+        userId: demoUser.id,
         mealType: "LUNCH",
         description: "Chicken breast, rice, broccoli, 1 tsp olive oil",
         mealName: "Chicken Rice Plate",
@@ -102,7 +135,7 @@ async function main() {
             proteinG: 54,
             carbsG: 0,
             fatG: 7,
-            notes: "Skinless grilled chicken."
+            notes: "Skinless grilled chicken.",
           },
           {
             name: "Cooked rice",
@@ -111,7 +144,7 @@ async function main() {
             proteinG: 4,
             carbsG: 41,
             fatG: 1,
-            notes: "White rice, cooked."
+            notes: "White rice, cooked.",
           },
           {
             name: "Broccoli with olive oil",
@@ -120,13 +153,13 @@ async function main() {
             proteinG: 0,
             carbsG: 1,
             fatG: 6,
-            notes: "Oil added conservatively."
-          }
+            notes: "Oil added conservatively.",
+          },
         ]),
         analysisSource: "seed",
         analysisModel: "seed-data",
         consumedAt: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 13, 0, 0),
-      }
+      },
     ],
   });
 }

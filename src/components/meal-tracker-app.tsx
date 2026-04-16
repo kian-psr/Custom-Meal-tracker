@@ -14,6 +14,8 @@ import {
 } from "@/lib/date";
 import type { MealType } from "@/lib/meal-analysis-schema";
 import type {
+  AuthSessionResponse,
+  AuthUser,
   DailyDashboard,
   DailyHistorySummary,
   MealAnalysisResponse,
@@ -64,6 +66,16 @@ type SettingsDraft = {
   fatMinG: string;
   fatMaxG: string;
 };
+
+type AuthMode = "sign-in" | "sign-up";
+
+type AuthDraft = {
+  name: string;
+  email: string;
+  password: string;
+};
+
+class UnauthorizedRequestError extends Error {}
 
 function formatMacroValue(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -166,11 +178,189 @@ async function readErrorMessage(response: Response) {
 async function fetchDashboardPayload(date: string) {
   const response = await fetch(`/api/meals?date=${date}`, { cache: "no-store" });
 
+  if (response.status === 401) {
+    throw new UnauthorizedRequestError(await readErrorMessage(response));
+  }
+
   if (!response.ok) {
     throw new Error(await readErrorMessage(response));
   }
 
   return (await response.json()) as DailyDashboard;
+}
+
+async function fetchSessionPayload() {
+  const response = await fetch("/api/auth/session", { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  return (await response.json()) as AuthSessionResponse;
+}
+
+function createEmptyAuthDraft(): AuthDraft {
+  return {
+    name: "",
+    email: "",
+    password: "",
+  };
+}
+
+function AuthFeature({
+  title,
+  detail,
+}: {
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-white/70 bg-white/70 px-4 py-4">
+      <p className="text-sm font-semibold text-clay-900">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-clay-500">{detail}</p>
+    </div>
+  );
+}
+
+function AuthPanel({
+  mode,
+  draft,
+  error,
+  isSubmitting,
+  onModeChange,
+  onDraftChange,
+  onSubmit,
+}: {
+  mode: AuthMode;
+  draft: AuthDraft;
+  error: string | null;
+  isSubmitting: boolean;
+  onModeChange: (mode: AuthMode) => void;
+  onDraftChange: (field: keyof AuthDraft, value: string) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="glass-panel animate-rise grid gap-6 p-5 sm:p-6 lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="rounded-[28px] bg-gradient-to-br from-clay-900 via-clay-900 to-sage-900 p-6 text-white">
+        <p className="section-label !text-clay-200">Private Tracking</p>
+        <h2 className="mt-3 text-3xl leading-tight">
+          Create an account so every meal log, target, and photo stays yours.
+        </h2>
+        <p className="mt-4 max-w-xl text-sm leading-7 text-clay-100">
+          This app now keeps data per user instead of sharing one public log. Sign in
+          from your phone or laptop and you’ll land in the same private dashboard.
+        </p>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <AuthFeature
+            detail="Each account gets its own meals, photos, targets, and trend history."
+            title="User-specific data"
+          />
+          <AuthFeature
+            detail="Sessions stay signed in with a secure cookie, so logging remains fast."
+            title="Quick return"
+          />
+          <AuthFeature
+            detail="Railway can keep serving the same app link while users see only their own dashboard."
+            title="Ready for sharing"
+          />
+        </div>
+      </div>
+
+      <div className="rounded-[28px] border border-clay-100 bg-white/80 p-6">
+        <div className="flex gap-2 rounded-full border border-clay-200 bg-clay-50 p-1">
+          <button
+            className={clsx(
+              "flex-1 rounded-full px-4 py-3 text-sm font-semibold transition",
+              mode === "sign-in"
+                ? "bg-clay-900 text-white"
+                : "text-clay-600 hover:text-clay-900"
+            )}
+            onClick={() => onModeChange("sign-in")}
+            type="button"
+          >
+            Sign in
+          </button>
+          <button
+            className={clsx(
+              "flex-1 rounded-full px-4 py-3 text-sm font-semibold transition",
+              mode === "sign-up"
+                ? "bg-clay-900 text-white"
+                : "text-clay-600 hover:text-clay-900"
+            )}
+            onClick={() => onModeChange("sign-up")}
+            type="button"
+          >
+            Create account
+          </button>
+        </div>
+
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+          {mode === "sign-up" ? (
+            <label className="block">
+              <span className="text-sm font-medium text-clay-700">Name</span>
+              <input
+                className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+                onChange={(event) => onDraftChange("name", event.target.value)}
+                placeholder="Optional display name"
+                value={draft.name}
+              />
+            </label>
+          ) : null}
+
+          <label className="block">
+            <span className="text-sm font-medium text-clay-700">Email</span>
+            <input
+              autoComplete="email"
+              className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+              onChange={(event) => onDraftChange("email", event.target.value)}
+              placeholder="you@example.com"
+              type="email"
+              value={draft.email}
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-clay-700">Password</span>
+            <input
+              autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
+              className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+              onChange={(event) => onDraftChange("password", event.target.value)}
+              placeholder="At least 8 characters"
+              type="password"
+              value={draft.password}
+            />
+          </label>
+
+          {error ? (
+            <div className="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+              {error}
+            </div>
+          ) : null}
+
+          <button
+            className="inline-flex w-full items-center justify-center rounded-full bg-clay-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-clay-700 disabled:cursor-not-allowed disabled:bg-clay-300"
+            disabled={isSubmitting}
+            type="submit"
+          >
+            {isSubmitting
+              ? mode === "sign-up"
+                ? "Creating account..."
+                : "Signing in..."
+              : mode === "sign-up"
+                ? "Create account"
+                : "Sign in"}
+          </button>
+        </form>
+
+        <p className="mt-4 text-sm leading-6 text-clay-500">
+          {mode === "sign-up"
+            ? "Your account starts with the current cut defaults and an empty private meal log."
+            : "Use the same email and password from any device to reach your personal dashboard."}
+        </p>
+      </div>
+    </section>
+  );
 }
 
 function SummaryCard({
@@ -318,6 +508,12 @@ function HistoryDayButton({
 
 export function MealTrackerApp() {
   const [selectedDate, setSelectedDate] = useState(getDateKey());
+  const [sessionUser, setSessionUser] = useState<AuthUser | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
+  const [authDraft, setAuthDraft] = useState<AuthDraft>(createEmptyAuthDraft);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
 
   const [dashboard, setDashboard] = useState<DailyDashboard | null>(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
@@ -351,6 +547,11 @@ export function MealTrackerApp() {
       setDashboard(payload);
       setSettingsDraft(createSettingsDraft(payload.settings));
     } catch (error) {
+      if (error instanceof UnauthorizedRequestError) {
+        handleSignedOut(error.message);
+        return;
+      }
+
       setDashboardError(
         error instanceof Error ? error.message : "Unable to load the dashboard."
       );
@@ -359,10 +560,130 @@ export function MealTrackerApp() {
     }
   }
 
+  function handleSignedOut(message?: string) {
+    setSessionUser(null);
+    setDashboard(null);
+    setSettingsDraft(null);
+    setDashboardError(null);
+    setEditingMealId(null);
+    setEditDraft(null);
+    setBusyMealId(null);
+    setMutationError(null);
+    setAnalysisError(null);
+    setReviewDraft(null);
+    setAnalysisResponse(null);
+    setSelectedImage(null);
+    setDescription("");
+    setMealType("LUNCH");
+    setAuthError(message ?? null);
+    setIsLoadingDashboard(false);
+  }
+
+  async function loadSession() {
+    setIsLoadingSession(true);
+
+    try {
+      const payload = await fetchSessionPayload();
+      setSessionUser(payload.user);
+      setAuthError(null);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Unable to load the session.");
+      setSessionUser(null);
+    } finally {
+      setIsLoadingSession(false);
+    }
+  }
+
+  function updateAuthDraft(field: keyof AuthDraft, value: string) {
+    setAuthDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError(null);
+    setMutationError(null);
+    setIsSubmittingAuth(true);
+
+    try {
+      const response = await fetch(
+        authMode === "sign-up" ? "/api/auth/sign-up" : "/api/auth/sign-in",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: authDraft.name.trim(),
+            email: authDraft.email.trim(),
+            password: authDraft.password,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      const payload = (await response.json()) as AuthSessionResponse;
+      const today = getDateKey();
+
+      setSessionUser(payload.user);
+      setSelectedDate(today);
+      setAuthDraft(createEmptyAuthDraft());
+      setAuthError(null);
+      await loadDashboard(today);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Unable to authenticate.");
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  }
+
+  async function handleSignOut() {
+    setMutationError(null);
+
+    try {
+      const response = await fetch("/api/auth/sign-out", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      setAuthMode("sign-in");
+      setAuthDraft(createEmptyAuthDraft());
+      handleSignedOut();
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : "Unable to sign out.");
+    }
+  }
+
+  useEffect(() => {
+    void loadSession();
+  }, []);
+
   useEffect(() => {
     let active = true;
 
     async function syncDashboard() {
+      if (isLoadingSession) {
+        return;
+      }
+
+      if (!sessionUser) {
+        if (active) {
+          setDashboard(null);
+          setSettingsDraft(null);
+          setDashboardError(null);
+          setIsLoadingDashboard(false);
+        }
+        return;
+      }
+
       setDashboardError(null);
       setIsLoadingDashboard(true);
 
@@ -377,6 +698,11 @@ export function MealTrackerApp() {
         setSettingsDraft(createSettingsDraft(payload.settings));
       } catch (error) {
         if (!active) {
+          return;
+        }
+
+        if (error instanceof UnauthorizedRequestError) {
+          handleSignedOut(error.message);
           return;
         }
 
@@ -395,7 +721,7 @@ export function MealTrackerApp() {
     return () => {
       active = false;
     };
-  }, [selectedDate]);
+  }, [isLoadingSession, selectedDate, sessionUser]);
 
   useEffect(() => {
     if (!selectedImage) {
@@ -438,6 +764,12 @@ export function MealTrackerApp() {
         method: "POST",
         body: formData,
       });
+
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
 
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));
@@ -513,6 +845,12 @@ export function MealTrackerApp() {
         body: formData,
       });
 
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));
       }
@@ -566,6 +904,12 @@ export function MealTrackerApp() {
         }),
       });
 
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));
       }
@@ -593,6 +937,12 @@ export function MealTrackerApp() {
       const response = await fetch(`/api/meals/${mealId}`, {
         method: "DELETE",
       });
+
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
 
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));
@@ -634,6 +984,12 @@ export function MealTrackerApp() {
         }),
       });
 
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
       if (!response.ok) {
         throw new Error(await readErrorMessage(response));
       }
@@ -661,34 +1017,95 @@ export function MealTrackerApp() {
             </p>
           </div>
 
-          <div className="grid w-full gap-3 sm:grid-cols-2 xl:max-w-xl">
+          <div className="w-full xl:max-w-xl">
             <div className="rounded-[22px] border border-white/60 bg-white/70 p-4">
-              <p className="section-label">Selected Day</p>
-              <p className="mt-3 text-3xl font-semibold text-clay-900">
-                {formatDisplayDate(selectedDate)}
-              </p>
-              <p className="mt-1 text-sm text-clay-500">
-                {isToday(selectedDate) ? "Today’s live log." : "Reviewing a past day."}
-              </p>
+              {isLoadingSession ? (
+                <p className="text-sm text-clay-500">Checking your account session...</p>
+              ) : sessionUser ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="section-label">Signed In</p>
+                    <p className="mt-2 text-lg font-semibold text-clay-900">
+                      {sessionUser.name || sessionUser.email}
+                    </p>
+                    <p className="mt-1 text-sm text-clay-500">{sessionUser.email}</p>
+                  </div>
+                  <button
+                    className="rounded-full border border-clay-200 bg-white px-4 py-2 text-sm font-semibold text-clay-700 transition hover:border-clay-400"
+                    onClick={() => void handleSignOut()}
+                    type="button"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <p className="section-label">Private Accounts</p>
+                  <p className="mt-2 text-lg font-semibold text-clay-900">
+                    One shared link, separate dashboards.
+                  </p>
+                  <p className="mt-1 text-sm text-clay-500">
+                    Sign in below to keep meals, targets, and saved photos attached to
+                    your own account.
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="rounded-[22px] border border-white/60 bg-white/70 p-4">
-              <p className="section-label">Photo Memory</p>
-              <p className="mt-3 text-3xl font-semibold text-clay-900">
-                {dashboard?.meals.filter((meal) => meal.photoUrl).length ?? 0}
-              </p>
-              <p className="mt-1 text-sm text-clay-500">
-                Saved meal photos on the selected day.
-              </p>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[22px] border border-white/60 bg-white/70 p-4">
+                <p className="section-label">Selected Day</p>
+                <p className="mt-3 text-3xl font-semibold text-clay-900">
+                  {formatDisplayDate(selectedDate)}
+                </p>
+                <p className="mt-1 text-sm text-clay-500">
+                  {isToday(selectedDate) ? "Today’s live log." : "Reviewing a past day."}
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-white/60 bg-white/70 p-4">
+                <p className="section-label">
+                  {sessionUser ? "Photo Memory" : "Account Access"}
+                </p>
+                <p className="mt-3 text-3xl font-semibold text-clay-900">
+                  {sessionUser
+                    ? dashboard?.meals.filter((meal) => meal.photoUrl).length ?? 0
+                    : "24/7"}
+                </p>
+                <p className="mt-1 text-sm text-clay-500">
+                  {sessionUser
+                    ? "Saved meal photos on the selected day."
+                    : "Log in from any device and open your own private dashboard."}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {mutationError ? (
-        <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-          {mutationError}
-        </div>
-      ) : null}
+      {isLoadingSession ? (
+        <section className="glass-panel animate-rise rounded-[28px] p-6 text-sm text-clay-500">
+          Loading your secure session...
+        </section>
+      ) : !sessionUser ? (
+        <AuthPanel
+          draft={authDraft}
+          error={authError}
+          isSubmitting={isSubmittingAuth}
+          mode={authMode}
+          onDraftChange={updateAuthDraft}
+          onModeChange={(mode) => {
+            setAuthMode(mode);
+            setAuthError(null);
+          }}
+          onSubmit={handleAuthSubmit}
+        />
+      ) : (
+        <>
+          {mutationError ? (
+            <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+              {mutationError}
+            </div>
+          ) : null}
 
       <section className="glass-panel animate-rise p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1621,6 +2038,8 @@ export function MealTrackerApp() {
           })}
         </div>
       </section>
+        </>
+      )}
     </main>
   );
 }
