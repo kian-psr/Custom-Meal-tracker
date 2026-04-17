@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import type { AdminUsersResponse } from "@/lib/types";
+import type {
+  AdminSystemDiagnosticsResponse,
+  AdminUsersResponse,
+} from "@/lib/types";
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -41,6 +44,7 @@ function SummaryCard({
 
 export function AdminDashboard() {
   const [payload, setPayload] = useState<AdminUsersResponse | null>(null);
+  const [system, setSystem] = useState<AdminSystemDiagnosticsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -52,21 +56,32 @@ export function AdminDashboard() {
       setError(null);
 
       try {
-        const response = await fetch("/api/admin/users", {
-          cache: "no-store",
-        });
+        const [usersResponse, systemResponse] = await Promise.all([
+          fetch("/api/admin/users", {
+            cache: "no-store",
+          }),
+          fetch("/api/admin/system", {
+            cache: "no-store",
+          }),
+        ]);
 
-        if (!response.ok) {
-          throw new Error(await readErrorMessage(response));
+        if (!usersResponse.ok) {
+          throw new Error(await readErrorMessage(usersResponse));
         }
 
-        const nextPayload = (await response.json()) as AdminUsersResponse;
+        if (!systemResponse.ok) {
+          throw new Error(await readErrorMessage(systemResponse));
+        }
+
+        const nextPayload = (await usersResponse.json()) as AdminUsersResponse;
+        const nextSystem = (await systemResponse.json()) as AdminSystemDiagnosticsResponse;
 
         if (!active) {
           return;
         }
 
         setPayload(nextPayload);
+        setSystem(nextSystem);
       } catch (nextError) {
         if (!active) {
           return;
@@ -149,6 +164,119 @@ export function AdminDashboard() {
               value={String(payload.summary.activeLast7Days)}
             />
           </section>
+
+          {system ? (
+            <section className="glass-panel animate-rise p-5 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="section-label">System Diagnostics</p>
+                  <h2 className="mt-3 text-2xl text-clay-900">
+                    Backend persistence and auth configuration
+                  </h2>
+                </div>
+                <p className="text-sm text-clay-500">
+                  Use this section to confirm the live deploy is really using the right
+                  database and volume.
+                </p>
+              </div>
+
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-[24px] border border-clay-100 bg-white/80 p-5">
+                  <p className="section-label">Database</p>
+                  <div className="mt-4 space-y-3 text-sm text-clay-700">
+                    <div className="rounded-[18px] bg-clay-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-clay-500">
+                        Target
+                      </p>
+                      <p className="mt-2 font-semibold text-clay-900">
+                        {system.persistence.databaseTarget}
+                      </p>
+                    </div>
+                    <div className="rounded-[18px] bg-clay-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-clay-500">
+                        File Path
+                      </p>
+                      <p className="mt-2 break-all text-clay-900">
+                        {system.persistence.databaseFilePath ?? "Not a SQLite file path"}
+                      </p>
+                    </div>
+                    <div className="rounded-[18px] bg-clay-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-clay-500">
+                        Railway Volume
+                      </p>
+                      <p className="mt-2 text-clay-900">
+                        {system.persistence.railwayVolumeMountPath ?? "No Railway volume detected"}
+                      </p>
+                    </div>
+                    <div className="rounded-[18px] bg-clay-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-clay-500">
+                        Uses Persistent Volume
+                      </p>
+                      <p className="mt-2 font-semibold text-clay-900">
+                        {system.persistence.usesRailwayVolumeForDatabase ? "Yes" : "No"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-clay-100 bg-white/80 p-5">
+                  <p className="section-label">Auth And Runtime</p>
+                  <div className="mt-4 space-y-3 text-sm text-clay-700">
+                    <div className="rounded-[18px] bg-clay-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-clay-500">
+                        Auth Secret Fingerprint
+                      </p>
+                      <p className="mt-2 font-semibold text-clay-900">
+                        {system.auth.authSecretFingerprint}
+                      </p>
+                      <p className="mt-2 text-xs text-clay-500">
+                        If this changes between deploys, everyone gets signed out.
+                      </p>
+                    </div>
+                    <div className="rounded-[18px] bg-clay-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-clay-500">
+                        Session TTL
+                      </p>
+                      <p className="mt-2 text-clay-900">{system.auth.sessionTtlDays} days</p>
+                    </div>
+                    <div className="rounded-[18px] bg-clay-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-clay-500">
+                        OpenAI
+                      </p>
+                      <p className="mt-2 text-clay-900">
+                        {system.openAI.useMockAnalysis
+                          ? "Mock or fallback mode active"
+                          : `Live model: ${system.openAI.model}`}
+                      </p>
+                    </div>
+                    <div className="rounded-[18px] bg-clay-50 px-4 py-3">
+                      <p className="text-xs uppercase tracking-[0.18em] text-clay-500">
+                        Runtime Counts
+                      </p>
+                      <p className="mt-2 text-clay-900">
+                        {system.databaseCounts.users} users, {system.databaseCounts.meals} meals,{" "}
+                        {system.databaseCounts.activeSessions} active sessions
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <p className="section-label">Warnings</p>
+                <div className="mt-3 space-y-3">
+                  {system.warnings.map((warning) => (
+                    <div
+                      key={warning}
+                      className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"
+                    >
+                      {warning}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           <section className="glass-panel animate-rise p-5 sm:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

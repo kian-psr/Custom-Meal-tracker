@@ -101,7 +101,7 @@ For a local production-style run:
 
 ```bash
 ./npmw run build
-HOSTNAME=127.0.0.1 ./npmw run start
+HOST=127.0.0.1 ./npmw run start
 ```
 
 The production start script now:
@@ -162,6 +162,8 @@ The app uses `npm start`, which runs the production startup script and syncs the
 
 After you redeploy, each person must create their own account from the shared Railway URL. Meals, targets, and stored photos are then filtered to the signed-in user.
 
+The production startup script now refuses to boot on Railway if `DATABASE_URL` points outside the mounted volume while using SQLite. That prevents silent account resets caused by deploying onto ephemeral storage.
+
 ## Scripts
 
 ```bash
@@ -175,6 +177,8 @@ After you redeploy, each person must create their own account from the shared Ra
 ./npmw run db:seed
 ./npmw run db:reset
 ```
+
+`typecheck` now runs `next typegen` first so route types stay in sync even from a clean checkout.
 
 ## Product Notes
 
@@ -222,9 +226,11 @@ After you redeploy, each person must create their own account from the shared Ra
 
 - The admin page lives at `/admin`
 - It shows signed-up users, account created date, meal counts, and last activity
+- It also includes system diagnostics for database path, Railway volume usage, auth secret fingerprint, session counts, and backend warnings
 - It only works for emails listed in `ADMIN_EMAILS`
 - The data comes from the same live SQLite database file the app already uses on Railway
 - Password hashes are never shown in the admin page
+- The system diagnostics route is `GET /api/admin/system`
 
 ## Files To Know
 
@@ -232,12 +238,14 @@ After you redeploy, each person must create their own account from the shared Ra
 - `src/app/api/meals/*` -> meal CRUD + analysis
 - `src/app/api/settings/route.ts` -> saved targets
 - `src/app/api/admin/users/route.ts` -> protected admin user summary endpoint
+- `src/app/api/admin/system/route.ts` -> protected backend diagnostics endpoint
 - `src/app/admin/page.tsx` -> admin page route
 - `src/app/api/photos/[fileName]/route.ts` -> local meal photo serving
 - `src/lib/meal-analysis.ts` -> OpenAI + fallback analysis
 - `src/lib/meals.ts` -> dashboard aggregation and meal persistence
 - `src/lib/settings.ts` -> saved targets helpers
 - `src/lib/admin.ts` -> admin access rules and user snapshot query
+- `src/lib/system-diagnostics.ts` -> deployment and persistence diagnostics
 - `src/lib/file-storage.ts` -> local and Railway photo storage rules
 - `scripts/start-production.sh` -> production startup entrypoint
 - `prisma/schema.prisma` -> database schema

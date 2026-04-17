@@ -54,6 +54,41 @@ export type AdminUsersResponse = {
   users: AdminUserSummary[];
 };
 
+export type AdminSystemDiagnosticsResponse = {
+  environment: {
+    nodeEnv: string;
+    isRailway: boolean;
+    railwayEnvironmentName: string | null;
+  };
+  persistence: {
+    databaseUrlKind: "sqlite" | "other";
+    databaseTarget: string;
+    databaseFilePath: string | null;
+    railwayVolumeMountPath: string | null;
+    usesRailwayVolumeForDatabase: boolean;
+    mealPhotoStorageDir: string;
+  };
+  auth: {
+    adminEmailsConfigured: boolean;
+    adminEmailCount: number;
+    authSecretFingerprint: string;
+    sessionTtlDays: number;
+  };
+  openAI: {
+    hasApiKey: boolean;
+    useMockAnalysis: boolean;
+    model: string;
+  };
+  databaseCounts: {
+    users: number;
+    meals: number;
+    sessions: number;
+    activeSessions: number;
+    settings: number;
+  };
+  warnings: string[];
+};
+
 export type UserSettingsRecord = {
   id: string;
   targets: DailyTargets;
