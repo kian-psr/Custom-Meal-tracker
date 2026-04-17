@@ -62,7 +62,7 @@ export function buildCutStatus(totals: MacroTotals, targets: DailyTargets): CutS
     const proteinGap = Math.max(0, proteinRemaining);
 
     return {
-      label: proteinGap <= 20 ? "Strong finish available" : "On track for your cut",
+      label: proteinGap <= 20 ? "Strong finish available" : "On track",
       tone: "good",
       reasons: [
         proteinGap <= 20

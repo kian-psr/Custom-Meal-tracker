@@ -4,6 +4,11 @@ import type {
   ConfidenceLabel,
   MealType,
 } from "@/lib/meal-analysis-schema";
+import type {
+  GoalPlannerProfile,
+  GoalPlannerRecommendation,
+  SettingsMode,
+} from "@/lib/goal-planner";
 
 export type MacroTotals = {
   calories: number;
@@ -89,9 +94,24 @@ export type AdminSystemDiagnosticsResponse = {
   warnings: string[];
 };
 
+export type StoredGoalPlannerProfile = GoalPlannerProfile & {
+  metricValues: {
+    weightKg: number;
+    heightCm: number;
+  };
+};
+
+export type UserGoalPlannerRecord = {
+  mode: SettingsMode;
+  profile: StoredGoalPlannerProfile;
+  recommendation: GoalPlannerRecommendation;
+};
+
 export type UserSettingsRecord = {
   id: string;
   targets: DailyTargets;
+  mode: SettingsMode;
+  planner: UserGoalPlannerRecord | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -164,4 +184,9 @@ export type MealAnalysisResponse = {
   analysis: AnalyzedMeal;
   source: Extract<AnalysisSource, "openai" | "mock">;
   model: string;
+};
+
+export type GoalPlannerPreviewResponse = {
+  profile: GoalPlannerProfile;
+  recommendation: GoalPlannerRecommendation;
 };

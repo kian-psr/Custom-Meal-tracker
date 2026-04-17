@@ -1,6 +1,6 @@
-# Cutting Meal Macro Tracker
+# Meal Macro Tracker
 
-A local-first meal tracking app for cutting that uses a meal photo plus a short description to estimate macros, save the meal with its photo, and compare each day against your saved targets.
+A local-first meal tracking app that uses a meal photo plus a short description to estimate macros, save the meal with its photo, and compare each day against user-specific targets.
 
 ## What This Version Includes
 
@@ -10,7 +10,8 @@ A local-first meal tracking app for cutting that uses a meal photo plus a short 
 - Editable review step before saving
 - Stored meal photos with private access per signed-in user
 - Daily log with edit and delete support
-- Saved custom targets in the database
+- Manual daily targets saved in the database
+- Guided goal calculator with age, sex, height, weight, activity, cut/maintain/bulk, and macro preferences
 - Date navigation for past days
 - Seven-day history and weekly trend summary
 - SQLite storage through Prisma

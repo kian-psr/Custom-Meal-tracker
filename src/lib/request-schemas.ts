@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 import {
+  ACTIVITY_LEVELS,
+  BIOLOGICAL_SEXES,
+  GOAL_PHASES,
+  HEIGHT_UNITS,
+  MACRO_PREFERENCES,
+  WEIGHT_UNITS,
+} from "@/lib/goal-planner";
+import {
   analyzedMealSchema,
   analysisSourceSchema,
   mealTypeSchema,
@@ -10,6 +18,13 @@ const isoDateTimeSchema = z
   .string()
   .trim()
   .refine((value) => !Number.isNaN(new Date(value).getTime()), "Invalid date/time.");
+
+const biologicalSexSchema = z.enum(BIOLOGICAL_SEXES);
+const weightUnitSchema = z.enum(WEIGHT_UNITS);
+const heightUnitSchema = z.enum(HEIGHT_UNITS);
+const activityLevelSchema = z.enum(ACTIVITY_LEVELS);
+const goalPhaseSchema = z.enum(GOAL_PHASES);
+const macroPreferenceSchema = z.enum(MACRO_PREFERENCES);
 
 export const authEmailSchema = z
   .string()
@@ -71,4 +86,58 @@ export const updateSettingsSchema = z
   .refine((value) => value.fatMinG <= value.fatMaxG, {
     message: "Fat minimum must be less than or equal to the maximum.",
     path: ["fatMaxG"],
+  });
+
+export const goalPlannerSchema = z
+  .object({
+    sex: biologicalSexSchema,
+    ageYears: z.coerce.number().int().min(14).max(100),
+    activityLevel: activityLevelSchema,
+    goalPhase: goalPhaseSchema,
+    weight: z.object({
+      value: z.coerce.number().positive().max(900),
+      unit: weightUnitSchema,
+    }),
+    height: z.object({
+      value: z.coerce.number().positive().max(300),
+      unit: heightUnitSchema,
+    }),
+    macroPreferences: z.object({
+      protein: macroPreferenceSchema,
+      carbs: macroPreferenceSchema,
+      fat: macroPreferenceSchema,
+    }),
+  })
+  .superRefine((value, context) => {
+    if (value.weight.unit === "KG" && value.weight.value > 400) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["weight", "value"],
+        message: "Weight in kilograms looks too high.",
+      });
+    }
+
+    if (value.weight.unit === "LB" && value.weight.value > 900) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["weight", "value"],
+        message: "Weight in pounds looks too high.",
+      });
+    }
+
+    if (value.height.unit === "CM" && (value.height.value < 100 || value.height.value > 260)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["height", "value"],
+        message: "Height in centimeters should be between 100 and 260.",
+      });
+    }
+
+    if (value.height.unit === "IN" && (value.height.value < 40 || value.height.value > 102)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["height", "value"],
+        message: "Height in inches should be between 40 and 102.",
+      });
+    }
   });

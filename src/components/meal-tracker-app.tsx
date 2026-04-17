@@ -4,6 +4,28 @@ import { clsx } from "clsx";
 import { useEffect, useState } from "react";
 
 import {
+  ACTIVITY_LEVELS,
+  BIOLOGICAL_SEXES,
+  GOAL_PHASES,
+  HEIGHT_UNITS,
+  MACRO_PREFERENCES,
+  WEIGHT_UNITS,
+  centimetersToUnit,
+  kilogramsToUnit,
+  unitToCentimeters,
+  unitToKilograms,
+} from "@/lib/goal-planner";
+import type {
+  ActivityLevel,
+  BiologicalSex,
+  GoalPhase,
+  GoalPlannerRecommendation,
+  HeightUnit,
+  MacroPreference,
+  SettingsMode,
+  WeightUnit,
+} from "@/lib/goal-planner";
+import {
   addDays,
   dateTimeLocalForDay,
   formatDisplayDate,
@@ -18,6 +40,7 @@ import type {
   AuthUser,
   DailyDashboard,
   DailyHistorySummary,
+  GoalPlannerPreviewResponse,
   MealAnalysisResponse,
   MealLogRecord,
   UserSettingsRecord,
@@ -35,6 +58,36 @@ const SOURCE_LABELS = {
   mock: "Demo mode",
   seed: "Seeded sample",
 } as const;
+
+const SEX_LABELS: Record<BiologicalSex, string> = {
+  MALE: "Male",
+  FEMALE: "Female",
+};
+
+const GOAL_LABELS: Record<GoalPhase, string> = {
+  CUT: "Cut",
+  MAINTAIN: "Maintain",
+  BULK: "Bulk",
+};
+
+const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
+  SEDENTARY: "Sedentary",
+  LIGHT: "Light exercise",
+  MODERATE: "Moderate exercise",
+  ACTIVE: "Active training",
+  VERY_ACTIVE: "Very active",
+};
+
+const MACRO_PREFERENCE_LABELS: Record<MacroPreference, string> = {
+  LOWER: "Lower",
+  STANDARD: "Standard",
+  HIGHER: "Higher",
+};
+
+const SETTINGS_MODE_LABELS: Record<SettingsMode, string> = {
+  MANUAL: "Manual targets",
+  GUIDED: "Goal calculator",
+};
 
 type ReviewDraft = {
   mealName: string;
@@ -66,6 +119,22 @@ type SettingsDraft = {
   fatMinG: string;
   fatMaxG: string;
 };
+
+type PlannerDraft = {
+  sex: BiologicalSex;
+  ageYears: string;
+  activityLevel: ActivityLevel;
+  goalPhase: GoalPhase;
+  weightValue: string;
+  weightUnit: WeightUnit;
+  heightValue: string;
+  heightUnit: HeightUnit;
+  proteinPreference: MacroPreference;
+  carbsPreference: MacroPreference;
+  fatPreference: MacroPreference;
+};
+
+type SettingsTab = "guided" | "manual";
 
 type AuthMode = "sign-in" | "sign-up";
 
@@ -163,6 +232,46 @@ function createSettingsDraft(settings: UserSettingsRecord): SettingsDraft {
     carbsMaxG: String(settings.targets.carbsG.max),
     fatMinG: String(settings.targets.fatG.min),
     fatMaxG: String(settings.targets.fatG.max),
+  };
+}
+
+function createPlannerDraft(settings: UserSettingsRecord): PlannerDraft {
+  const profile = settings.planner?.profile;
+
+  return {
+    sex: profile?.sex ?? "MALE",
+    ageYears: profile ? String(profile.ageYears) : "30",
+    activityLevel: profile?.activityLevel ?? "MODERATE",
+    goalPhase: profile?.goalPhase ?? "CUT",
+    weightValue: profile ? String(profile.weight.value) : "80",
+    weightUnit: profile?.weight.unit ?? "KG",
+    heightValue: profile ? String(profile.height.value) : "180",
+    heightUnit: profile?.height.unit ?? "CM",
+    proteinPreference: profile?.macroPreferences.protein ?? "STANDARD",
+    carbsPreference: profile?.macroPreferences.carbs ?? "STANDARD",
+    fatPreference: profile?.macroPreferences.fat ?? "STANDARD",
+  };
+}
+
+function plannerDraftToPayload(draft: PlannerDraft) {
+  return {
+    sex: draft.sex,
+    ageYears: Number(draft.ageYears),
+    activityLevel: draft.activityLevel,
+    goalPhase: draft.goalPhase,
+    weight: {
+      value: Number(draft.weightValue),
+      unit: draft.weightUnit,
+    },
+    height: {
+      value: Number(draft.heightValue),
+      unit: draft.heightUnit,
+    },
+    macroPreferences: {
+      protein: draft.proteinPreference,
+      carbs: draft.carbsPreference,
+      fat: draft.fatPreference,
+    },
   };
 }
 
@@ -355,7 +464,7 @@ function AuthPanel({
 
         <p className="mt-4 text-sm leading-6 text-clay-500">
           {mode === "sign-up"
-            ? "Your account starts with the current cut defaults and an empty private meal log."
+            ? "Your account starts with starter targets and an empty private meal log."
             : "Use the same email and password from any device to reach your personal dashboard."}
         </p>
       </div>
@@ -536,7 +645,15 @@ export function MealTrackerApp() {
   const [busyMealId, setBusyMealId] = useState<string | null>(null);
 
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft | null>(null);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("guided");
+  const [plannerDraft, setPlannerDraft] = useState<PlannerDraft | null>(null);
+  const [plannerPreview, setPlannerPreview] = useState<GoalPlannerRecommendation | null>(
+    null
+  );
+  const [plannerError, setPlannerError] = useState<string | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isCalculatingPlan, setIsCalculatingPlan] = useState(false);
+  const [isApplyingPlan, setIsApplyingPlan] = useState(false);
 
   async function loadDashboard(date = selectedDate) {
     setDashboardError(null);
@@ -546,6 +663,9 @@ export function MealTrackerApp() {
       const payload = await fetchDashboardPayload(date);
       setDashboard(payload);
       setSettingsDraft(createSettingsDraft(payload.settings));
+      setPlannerDraft(createPlannerDraft(payload.settings));
+      setPlannerPreview(payload.settings.planner?.recommendation ?? null);
+      setPlannerError(null);
     } catch (error) {
       if (error instanceof UnauthorizedRequestError) {
         handleSignedOut(error.message);
@@ -564,6 +684,9 @@ export function MealTrackerApp() {
     setSessionUser(null);
     setDashboard(null);
     setSettingsDraft(null);
+    setPlannerDraft(null);
+    setPlannerPreview(null);
+    setPlannerError(null);
     setDashboardError(null);
     setEditingMealId(null);
     setEditDraft(null);
@@ -678,6 +801,9 @@ export function MealTrackerApp() {
         if (active) {
           setDashboard(null);
           setSettingsDraft(null);
+          setPlannerDraft(null);
+          setPlannerPreview(null);
+          setPlannerError(null);
           setDashboardError(null);
           setIsLoadingDashboard(false);
         }
@@ -696,6 +822,9 @@ export function MealTrackerApp() {
 
         setDashboard(payload);
         setSettingsDraft(createSettingsDraft(payload.settings));
+        setPlannerDraft(createPlannerDraft(payload.settings));
+        setPlannerPreview(payload.settings.planner?.recommendation ?? null);
+        setPlannerError(null);
       } catch (error) {
         if (!active) {
           return;
@@ -994,12 +1123,139 @@ export function MealTrackerApp() {
         throw new Error(await readErrorMessage(response));
       }
 
+      setSettingsTab("manual");
       await loadDashboard(selectedDate);
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : "Unable to save targets.");
     } finally {
       setIsSavingSettings(false);
     }
+  }
+
+  async function handleCalculatePlan() {
+    if (!plannerDraft) {
+      return;
+    }
+
+    setIsCalculatingPlan(true);
+    setPlannerError(null);
+    setMutationError(null);
+
+    try {
+      const response = await fetch("/api/settings/planner", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(plannerDraftToPayload(plannerDraft)),
+      });
+
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      const payload = (await response.json()) as GoalPlannerPreviewResponse;
+      setPlannerPreview(payload.recommendation);
+    } catch (error) {
+      setPlannerError(
+        error instanceof Error ? error.message : "Unable to calculate your plan."
+      );
+    } finally {
+      setIsCalculatingPlan(false);
+    }
+  }
+
+  async function handleApplyPlan() {
+    if (!plannerDraft) {
+      return;
+    }
+
+    setIsApplyingPlan(true);
+    setPlannerError(null);
+    setMutationError(null);
+
+    try {
+      const response = await fetch("/api/settings/planner", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(plannerDraftToPayload(plannerDraft)),
+      });
+
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      setSettingsTab("guided");
+      await loadDashboard(selectedDate);
+    } catch (error) {
+      setPlannerError(
+        error instanceof Error ? error.message : "Unable to save your guided plan."
+      );
+    } finally {
+      setIsApplyingPlan(false);
+    }
+  }
+
+  function handleWeightUnitChange(nextUnit: WeightUnit) {
+    setPlannerDraft((current) => {
+      if (!current || current.weightUnit === nextUnit) {
+        return current;
+      }
+
+      const nextValue =
+        current.weightValue.trim() && Number.isFinite(Number(current.weightValue))
+          ? String(
+              kilogramsToUnit(
+                unitToKilograms(Number(current.weightValue), current.weightUnit),
+                nextUnit
+              )
+            )
+          : current.weightValue;
+
+      return {
+        ...current,
+        weightUnit: nextUnit,
+        weightValue: nextValue,
+      };
+    });
+  }
+
+  function handleHeightUnitChange(nextUnit: HeightUnit) {
+    setPlannerDraft((current) => {
+      if (!current || current.heightUnit === nextUnit) {
+        return current;
+      }
+
+      const nextValue =
+        current.heightValue.trim() && Number.isFinite(Number(current.heightValue))
+          ? String(
+              centimetersToUnit(
+                unitToCentimeters(Number(current.heightValue), current.heightUnit),
+                nextUnit
+              )
+            )
+          : current.heightValue;
+
+      return {
+        ...current,
+        heightUnit: nextUnit,
+        heightValue: nextValue,
+      };
+    });
   }
 
   return (
@@ -1009,11 +1265,12 @@ export function MealTrackerApp() {
           <div className="max-w-3xl">
             <p className="section-label">Full Meal Tracker</p>
             <h1 className="mt-3 max-w-2xl text-4xl leading-tight text-clay-900 sm:text-5xl">
-              Log meals with saved photos, adjustable targets, and a rolling cut dashboard.
+              Log meals with saved photos, guided calorie planning, and a rolling macro dashboard.
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-clay-600 sm:text-lg">
-              Analyze from a photo, review the estimate before saving, jump across days,
-              and keep a clearer view of where your calories and macros are trending.
+              Analyze from a photo, review the estimate before saving, calculate custom
+              targets from your body stats and goal, and keep a clearer view of where
+              your calories and macros are trending.
             </p>
           </div>
 
@@ -1468,6 +1725,20 @@ export function MealTrackerApp() {
 
             {dashboard ? (
               <div className="mt-6 space-y-5">
+                <div className="rounded-[20px] border border-clay-100 bg-clay-50/80 px-4 py-4">
+                  <p className="section-label">Active target source</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <span className="rounded-full border border-clay-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-clay-700">
+                      {SETTINGS_MODE_LABELS[dashboard.settings.mode]}
+                    </span>
+                    <p className="text-sm text-clay-500">
+                      {dashboard.settings.mode === "GUIDED"
+                        ? "Targets came from your body stats, goal phase, and macro preferences."
+                        : "Targets are set manually and can be edited directly."}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="grid gap-3 sm:grid-cols-2">
                   <SummaryCard
                     label="Calories"
@@ -1538,7 +1809,7 @@ export function MealTrackerApp() {
                 </div>
 
                 <div className="rounded-[24px] border border-clay-100 bg-gradient-to-br from-clay-900 to-sage-900 p-5 text-white">
-                  <p className="section-label !text-clay-200">Cut Status</p>
+                  <p className="section-label !text-clay-200">Daily Status</p>
                   <h3 className="mt-3 text-2xl">{dashboard.status.label}</h3>
                   <ul className="mt-4 space-y-2 text-sm leading-6 text-clay-100">
                     {dashboard.status.reasons.map((reason) => (
@@ -1553,101 +1824,508 @@ export function MealTrackerApp() {
           </section>
 
           <section className="glass-panel animate-rise p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="section-label">Saved Targets</p>
-                <h2 className="mt-3 text-2xl text-clay-900">Adjust your cut plan</h2>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="section-label">Goal Settings</p>
+                  <h2 className="mt-3 text-2xl text-clay-900">Customize your daily targets</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-clay-500">
+                    Use the goal calculator for a guided setup based on body stats, activity,
+                    and goal phase, or keep full manual control over calories and macros.
+                  </p>
+                </div>
+
+                {dashboard ? (
+                  <div className="rounded-[20px] border border-clay-200 bg-clay-50/80 px-4 py-3 text-right">
+                    <p className="section-label">Current mode</p>
+                    <p className="mt-2 text-sm font-semibold text-clay-900">
+                      {SETTINGS_MODE_LABELS[dashboard.settings.mode]}
+                    </p>
+                  </div>
+                ) : null}
               </div>
-              <button
-                className="rounded-full bg-clay-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-clay-700 disabled:cursor-not-allowed disabled:bg-clay-300"
-                disabled={!settingsDraft || isSavingSettings}
-                onClick={handleSaveSettings}
-                type="button"
-              >
-                {isSavingSettings ? "Saving..." : "Save targets"}
-              </button>
+
+              <div className="flex gap-2 rounded-full border border-clay-200 bg-clay-50 p-1">
+                <button
+                  className={clsx(
+                    "flex-1 rounded-full px-4 py-3 text-sm font-semibold transition",
+                    settingsTab === "guided"
+                      ? "bg-clay-900 text-white"
+                      : "text-clay-600 hover:text-clay-900"
+                  )}
+                  onClick={() => setSettingsTab("guided")}
+                  type="button"
+                >
+                  Goal calculator
+                </button>
+                <button
+                  className={clsx(
+                    "flex-1 rounded-full px-4 py-3 text-sm font-semibold transition",
+                    settingsTab === "manual"
+                      ? "bg-clay-900 text-white"
+                      : "text-clay-600 hover:text-clay-900"
+                  )}
+                  onClick={() => setSettingsTab("manual")}
+                  type="button"
+                >
+                  Manual targets
+                </button>
+              </div>
             </div>
 
-            {settingsDraft ? (
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-sm font-medium text-clay-700">Calories</span>
-                  <input
-                    className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
-                    inputMode="numeric"
-                    onChange={(event) =>
-                      setSettingsDraft((current) =>
-                        current ? { ...current, calories: event.target.value } : current
-                      )
-                    }
-                    value={settingsDraft.calories}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-clay-700">Protein target</span>
-                  <input
-                    className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setSettingsDraft((current) =>
-                        current ? { ...current, proteinG: event.target.value } : current
-                      )
-                    }
-                    value={settingsDraft.proteinG}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-clay-700">Carbs min</span>
-                  <input
-                    className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setSettingsDraft((current) =>
-                        current ? { ...current, carbsMinG: event.target.value } : current
-                      )
-                    }
-                    value={settingsDraft.carbsMinG}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-clay-700">Carbs max</span>
-                  <input
-                    className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setSettingsDraft((current) =>
-                        current ? { ...current, carbsMaxG: event.target.value } : current
-                      )
-                    }
-                    value={settingsDraft.carbsMaxG}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-clay-700">Fat min</span>
-                  <input
-                    className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setSettingsDraft((current) =>
-                        current ? { ...current, fatMinG: event.target.value } : current
-                      )
-                    }
-                    value={settingsDraft.fatMinG}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-clay-700">Fat max</span>
-                  <input
-                    className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setSettingsDraft((current) =>
-                        current ? { ...current, fatMaxG: event.target.value } : current
-                      )
-                    }
-                    value={settingsDraft.fatMaxG}
-                  />
-                </label>
+            {settingsTab === "guided" && plannerDraft ? (
+              <div className="mt-5 space-y-5">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Sex</span>
+                    <select
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+                      onChange={(event) =>
+                        setPlannerDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                sex: event.target.value as BiologicalSex,
+                              }
+                            : current
+                        )
+                      }
+                      value={plannerDraft.sex}
+                    >
+                      {BIOLOGICAL_SEXES.map((option) => (
+                        <option key={option} value={option}>
+                          {SEX_LABELS[option]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Age</span>
+                    <input
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        setPlannerDraft((current) =>
+                          current ? { ...current, ageYears: event.target.value } : current
+                        )
+                      }
+                      placeholder="30"
+                      value={plannerDraft.ageYears}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Activity level</span>
+                    <select
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+                      onChange={(event) =>
+                        setPlannerDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                activityLevel: event.target.value as ActivityLevel,
+                              }
+                            : current
+                        )
+                      }
+                      value={plannerDraft.activityLevel}
+                    >
+                      {ACTIVITY_LEVELS.map((option) => (
+                        <option key={option} value={option}>
+                          {ACTIVITY_LABELS[option]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Goal phase</span>
+                    <select
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+                      onChange={(event) =>
+                        setPlannerDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                goalPhase: event.target.value as GoalPhase,
+                              }
+                            : current
+                        )
+                      }
+                      value={plannerDraft.goalPhase}
+                    >
+                      {GOAL_PHASES.map((option) => (
+                        <option key={option} value={option}>
+                          {GOAL_LABELS[option]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-[24px] border border-clay-100 bg-white/80 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="section-label">Weight</p>
+                        <p className="mt-2 text-sm text-clay-500">
+                          Enter the unit you naturally track in.
+                        </p>
+                      </div>
+                      <div className="flex gap-2 rounded-full border border-clay-200 bg-clay-50 p-1">
+                        {WEIGHT_UNITS.map((unit) => (
+                          <button
+                            key={unit}
+                            className={clsx(
+                              "rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition",
+                              plannerDraft.weightUnit === unit
+                                ? "bg-clay-900 text-white"
+                                : "text-clay-600 hover:text-clay-900"
+                            )}
+                            onClick={() => handleWeightUnitChange(unit)}
+                            type="button"
+                          >
+                            {unit.toLowerCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <input
+                      className="mt-4 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 text-lg outline-none transition focus:border-ember-500"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setPlannerDraft((current) =>
+                          current ? { ...current, weightValue: event.target.value } : current
+                        )
+                      }
+                      placeholder={plannerDraft.weightUnit === "KG" ? "80" : "176"}
+                      value={plannerDraft.weightValue}
+                    />
+                  </div>
+
+                  <div className="rounded-[24px] border border-clay-100 bg-white/80 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="section-label">Height</p>
+                        <p className="mt-2 text-sm text-clay-500">
+                          Switch between centimeters and inches anytime.
+                        </p>
+                      </div>
+                      <div className="flex gap-2 rounded-full border border-clay-200 bg-clay-50 p-1">
+                        {HEIGHT_UNITS.map((unit) => (
+                          <button
+                            key={unit}
+                            className={clsx(
+                              "rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition",
+                              plannerDraft.heightUnit === unit
+                                ? "bg-clay-900 text-white"
+                                : "text-clay-600 hover:text-clay-900"
+                            )}
+                            onClick={() => handleHeightUnitChange(unit)}
+                            type="button"
+                          >
+                            {unit.toLowerCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <input
+                      className="mt-4 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 text-lg outline-none transition focus:border-ember-500"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setPlannerDraft((current) =>
+                          current ? { ...current, heightValue: event.target.value } : current
+                        )
+                      }
+                      placeholder={plannerDraft.heightUnit === "CM" ? "180" : "71"}
+                      value={plannerDraft.heightValue}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-clay-100 bg-clay-50/70 p-4">
+                  <p className="section-label">Macro emphasis</p>
+                  <p className="mt-2 text-sm leading-6 text-clay-500">
+                    Bias the recommendation toward higher or lower protein, carbs, and fat
+                    while keeping calories matched to your goal.
+                  </p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <label className="block">
+                      <span className="text-sm font-medium text-clay-700">Protein</span>
+                      <select
+                        className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+                        onChange={(event) =>
+                          setPlannerDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  proteinPreference: event.target.value as MacroPreference,
+                                }
+                              : current
+                          )
+                        }
+                        value={plannerDraft.proteinPreference}
+                      >
+                        {MACRO_PREFERENCES.map((option) => (
+                          <option key={option} value={option}>
+                            {MACRO_PREFERENCE_LABELS[option]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="text-sm font-medium text-clay-700">Carbs</span>
+                      <select
+                        className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+                        onChange={(event) =>
+                          setPlannerDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  carbsPreference: event.target.value as MacroPreference,
+                                }
+                              : current
+                          )
+                        }
+                        value={plannerDraft.carbsPreference}
+                      >
+                        {MACRO_PREFERENCES.map((option) => (
+                          <option key={option} value={option}>
+                            {MACRO_PREFERENCE_LABELS[option]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="text-sm font-medium text-clay-700">Fat</span>
+                      <select
+                        className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none transition focus:border-ember-500"
+                        onChange={(event) =>
+                          setPlannerDraft((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  fatPreference: event.target.value as MacroPreference,
+                                }
+                              : current
+                          )
+                        }
+                        value={plannerDraft.fatPreference}
+                      >
+                        {MACRO_PREFERENCES.map((option) => (
+                          <option key={option} value={option}>
+                            {MACRO_PREFERENCE_LABELS[option]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                {plannerError ? (
+                  <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+                    {plannerError}
+                  </div>
+                ) : null}
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <button
+                      className="inline-flex items-center justify-center rounded-full bg-clay-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-clay-700 disabled:cursor-not-allowed disabled:bg-clay-300"
+                      disabled={isCalculatingPlan || isApplyingPlan}
+                      onClick={() => void handleCalculatePlan()}
+                      type="button"
+                    >
+                      {isCalculatingPlan ? "Calculating..." : "Preview targets"}
+                    </button>
+
+                    <button
+                      className="inline-flex items-center justify-center rounded-full border border-clay-200 bg-white px-5 py-3 text-sm font-semibold text-clay-700 transition hover:border-clay-400 disabled:cursor-not-allowed disabled:text-clay-300"
+                      disabled={isApplyingPlan || isCalculatingPlan}
+                      onClick={() => void handleApplyPlan()}
+                      type="button"
+                    >
+                      {isApplyingPlan ? "Applying..." : "Apply to my targets"}
+                    </button>
+                  </div>
+
+                  <p className="text-sm leading-6 text-clay-500">
+                    This calculator uses biological sex, age, body size, and activity
+                    level because standard maintenance-calorie formulas depend on those
+                    inputs. You can still fine-tune the saved targets manually afterward.
+                  </p>
+                </div>
+
+                {plannerPreview ? (
+                  <div className="rounded-[26px] border border-sage-100 bg-gradient-to-br from-white to-sage-50 p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="section-label">Guided recommendation</p>
+                        <h3 className="mt-3 text-2xl text-clay-900">
+                          {GOAL_LABELS[plannerDraft.goalPhase]} plan preview
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-clay-500">
+                          Maintenance estimate {plannerPreview.maintenanceCalories} kcal.
+                          Recommended daily intake {plannerPreview.targetCalories} kcal.
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-sage-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sage-700">
+                        {SETTINGS_MODE_LABELS.GUIDED}
+                      </span>
+                    </div>
+
+                    <div className="mt-5">
+                      <MacroStrip
+                        calories={plannerPreview.targetCalories}
+                        carbsG={plannerPreview.carbsG}
+                        fatG={plannerPreview.fatG}
+                        proteinG={plannerPreview.proteinG}
+                      />
+                    </div>
+
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[20px] border border-clay-100 bg-white/80 px-4 py-4">
+                        <p className="section-label">Saved target ranges</p>
+                        <div className="mt-3 space-y-2 text-sm text-clay-600">
+                          <p>Protein target: {plannerPreview.dailyTargets.proteinG} g</p>
+                          <p>
+                            Carb range: {plannerPreview.dailyTargets.carbsG.min}-
+                            {plannerPreview.dailyTargets.carbsG.max} g
+                          </p>
+                          <p>
+                            Fat range: {plannerPreview.dailyTargets.fatG.min}-
+                            {plannerPreview.dailyTargets.fatG.max} g
+                          </p>
+                          <p>Protein density: {plannerPreview.proteinPerKg} g/kg</p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[20px] border border-clay-100 bg-white/80 px-4 py-4">
+                        <p className="section-label">Why this changed</p>
+                        <ul className="mt-3 space-y-2 text-sm leading-6 text-clay-600">
+                          {plannerPreview.rationale.map((reason) => (
+                            <li key={reason} className="rounded-[16px] bg-clay-50 px-4 py-3">
+                              {reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {settingsTab === "manual" && settingsDraft ? (
+              <div className="mt-5 space-y-5">
+                <div className="rounded-[20px] border border-clay-100 bg-clay-50/70 px-4 py-4 text-sm leading-6 text-clay-500">
+                  Manual mode lets you override calories and macro ranges directly. Saving
+                  here makes these numbers the active targets, even if you previously used
+                  the calculator.
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Calories</span>
+                    <input
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        setSettingsDraft((current) =>
+                          current ? { ...current, calories: event.target.value } : current
+                        )
+                      }
+                      value={settingsDraft.calories}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Protein target</span>
+                    <input
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setSettingsDraft((current) =>
+                          current ? { ...current, proteinG: event.target.value } : current
+                        )
+                      }
+                      value={settingsDraft.proteinG}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Carbs min</span>
+                    <input
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setSettingsDraft((current) =>
+                          current ? { ...current, carbsMinG: event.target.value } : current
+                        )
+                      }
+                      value={settingsDraft.carbsMinG}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Carbs max</span>
+                    <input
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setSettingsDraft((current) =>
+                          current ? { ...current, carbsMaxG: event.target.value } : current
+                        )
+                      }
+                      value={settingsDraft.carbsMaxG}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Fat min</span>
+                    <input
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setSettingsDraft((current) =>
+                          current ? { ...current, fatMinG: event.target.value } : current
+                        )
+                      }
+                      value={settingsDraft.fatMinG}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-medium text-clay-700">Fat max</span>
+                    <input
+                      className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setSettingsDraft((current) =>
+                          current ? { ...current, fatMaxG: event.target.value } : current
+                        )
+                      }
+                      value={settingsDraft.fatMaxG}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <button
+                    className="inline-flex items-center justify-center rounded-full bg-clay-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-clay-700 disabled:cursor-not-allowed disabled:bg-clay-300"
+                    disabled={!settingsDraft || isSavingSettings}
+                    onClick={handleSaveSettings}
+                    type="button"
+                  >
+                    {isSavingSettings ? "Saving..." : "Save manual targets"}
+                  </button>
+
+                  <p className="text-sm leading-6 text-clay-500">
+                    If you want exact numbers instead of a formula-driven recommendation,
+                    manual mode keeps full control in your hands.
+                  </p>
+                </div>
               </div>
             ) : null}
           </section>
