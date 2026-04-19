@@ -91,15 +91,25 @@ export const updateSettingsSchema = z
 export const goalPlannerSchema = z
   .object({
     sex: biologicalSexSchema,
-    ageYears: z.coerce.number().int().min(14).max(100),
+    ageYears: z.coerce
+      .number()
+      .int("Age should be a whole number.")
+      .min(14, "Enter an age between 14 and 100.")
+      .max(100, "Enter an age between 14 and 100."),
     activityLevel: activityLevelSchema,
     goalPhase: goalPhaseSchema,
     weight: z.object({
-      value: z.coerce.number().positive().max(900),
+      value: z.coerce
+        .number()
+        .positive("Enter a weight greater than 0.")
+        .max(900, "Weight looks too high. Double-check the number and unit."),
       unit: weightUnitSchema,
     }),
     height: z.object({
-      value: z.coerce.number().positive().max(300),
+      value: z.coerce
+        .number()
+        .positive("Enter a height greater than 0.")
+        .max(300, "Height looks too high. Double-check the number and unit."),
       unit: heightUnitSchema,
     }),
     macroPreferences: z.object({
@@ -109,19 +119,21 @@ export const goalPlannerSchema = z
     }),
   })
   .superRefine((value, context) => {
-    if (value.weight.unit === "KG" && value.weight.value > 400) {
+    if (value.weight.unit === "KG" && (value.weight.value < 30 || value.weight.value > 400)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["weight", "value"],
-        message: "Weight in kilograms looks too high.",
+        message:
+          "Weight in kilograms should usually be between 30 and 400. If you entered pounds, switch the unit to lb.",
       });
     }
 
-    if (value.weight.unit === "LB" && value.weight.value > 900) {
+    if (value.weight.unit === "LB" && (value.weight.value < 66 || value.weight.value > 900)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["weight", "value"],
-        message: "Weight in pounds looks too high.",
+        message:
+          "Weight in pounds should usually be between 66 and 900. If you entered kilograms, switch the unit to kg.",
       });
     }
 
@@ -129,7 +141,8 @@ export const goalPlannerSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["height", "value"],
-        message: "Height in centimeters should be between 100 and 260.",
+        message:
+          "Height in centimeters should usually be between 100 and 260. If you entered inches, switch the unit to in.",
       });
     }
 
@@ -137,7 +150,8 @@ export const goalPlannerSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["height", "value"],
-        message: "Height in inches should be between 40 and 102.",
+        message:
+          "Height in inches should usually be between 40 and 102. If you entered centimeters, switch the unit to cm.",
       });
     }
   });

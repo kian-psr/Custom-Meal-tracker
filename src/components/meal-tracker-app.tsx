@@ -78,6 +78,14 @@ const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   VERY_ACTIVE: "Very active",
 };
 
+const ACTIVITY_HELPERS: Record<ActivityLevel, string> = {
+  SEDENTARY: "Mostly sitting, desk work, and little intentional exercise.",
+  LIGHT: "Light movement most days or 1 to 3 easier workouts per week.",
+  MODERATE: "Regular training 3 to 5 times per week with normal daily movement.",
+  ACTIVE: "Hard training most days, a physical job, or lots of daily movement.",
+  VERY_ACTIVE: "Very high output, like intense daily training, manual labor, or double sessions.",
+};
+
 const MACRO_PREFERENCE_LABELS: Record<MacroPreference, string> = {
   LOWER: "Lower",
   STANDARD: "Standard",
@@ -1258,6 +1266,10 @@ export function MealTrackerApp() {
     });
   }
 
+  const hasAnyLoggedMeals =
+    dashboard?.history.some((summary) => summary.mealCount > 0) ?? false;
+  const showFirstRunGuide = Boolean(sessionUser && dashboard && !hasAnyLoggedMeals);
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <section className="glass-panel animate-rise overflow-hidden bg-halo p-6 sm:p-8">
@@ -1396,6 +1408,59 @@ export function MealTrackerApp() {
           </div>
         </div>
       </section>
+
+      {showFirstRunGuide ? (
+        <section className="glass-panel animate-rise p-5 sm:p-6">
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="section-label">First-Time Setup</p>
+              <h2 className="mt-3 text-2xl text-clay-900">
+                Get your dashboard useful in about a minute
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-clay-500">
+                Start with the goal calculator if you want a guided estimate, or skip
+                straight to manual targets if you already know your numbers. Once your
+                targets look right, upload your first meal photo and save it to today.
+              </p>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+              <div className="rounded-[22px] border border-clay-100 bg-white/80 px-4 py-4">
+                <p className="section-label">Step 1</p>
+                <p className="mt-2 text-lg font-semibold text-clay-900">
+                  Pick guided or manual targets
+                </p>
+                <p className="mt-2 text-sm leading-6 text-clay-500">
+                  Use the calculator to estimate calories and macros from your body
+                  stats, or enter exact targets yourself.
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-clay-100 bg-white/80 px-4 py-4">
+                <p className="section-label">Step 2</p>
+                <p className="mt-2 text-lg font-semibold text-clay-900">
+                  Preview before you commit
+                </p>
+                <p className="mt-2 text-sm leading-6 text-clay-500">
+                  The calculator is a starting estimate, so preview the recommendation
+                  first and fine-tune it manually if needed.
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-clay-100 bg-white/80 px-4 py-4">
+                <p className="section-label">Step 3</p>
+                <p className="mt-2 text-lg font-semibold text-clay-900">
+                  Log your first meal
+                </p>
+                <p className="mt-2 text-sm leading-6 text-clay-500">
+                  Upload a quick photo, add a short description, review the assumptions,
+                  and save the meal to start the dashboard.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <section className="glass-panel animate-rise p-5 sm:p-6">
@@ -1937,6 +2002,9 @@ export function MealTrackerApp() {
                         </option>
                       ))}
                     </select>
+                    <p className="mt-2 text-sm leading-6 text-clay-500">
+                      {ACTIVITY_HELPERS[plannerDraft.activityLevel]}
+                    </p>
                   </label>
 
                   <label className="block">
@@ -2003,6 +2071,11 @@ export function MealTrackerApp() {
                       placeholder={plannerDraft.weightUnit === "KG" ? "80" : "176"}
                       value={plannerDraft.weightValue}
                     />
+                    <p className="mt-2 text-sm leading-6 text-clay-500">
+                      {plannerDraft.weightUnit === "KG"
+                        ? "Typical adult range: about 30 to 400 kg. If you meant pounds, switch the unit."
+                        : "Typical adult range: about 66 to 900 lb. If you meant kilograms, switch the unit."}
+                    </p>
                   </div>
 
                   <div className="rounded-[24px] border border-clay-100 bg-white/80 p-4">
@@ -2043,6 +2116,11 @@ export function MealTrackerApp() {
                       placeholder={plannerDraft.heightUnit === "CM" ? "180" : "71"}
                       value={plannerDraft.heightValue}
                     />
+                    <p className="mt-2 text-sm leading-6 text-clay-500">
+                      {plannerDraft.heightUnit === "CM"
+                        ? "Typical adult range: about 100 to 260 cm. If you meant inches, switch the unit."
+                        : "Typical adult range: about 40 to 102 in. If you meant centimeters, switch the unit."}
+                    </p>
                   </div>
                 </div>
 
@@ -2156,9 +2234,11 @@ export function MealTrackerApp() {
                   </div>
 
                   <p className="text-sm leading-6 text-clay-500">
-                    This calculator uses biological sex, age, body size, and activity
-                    level because standard maintenance-calorie formulas depend on those
-                    inputs. You can still fine-tune the saved targets manually afterward.
+                    This calculator is a starting estimate built from biological sex,
+                    age, body size, and activity level because standard maintenance-calorie
+                    formulas depend on those inputs. If your scale trend, hunger, recovery,
+                    or training performance suggest it is off, you can fine-tune the saved
+                    targets manually afterward.
                   </p>
                 </div>
 
@@ -2173,6 +2253,8 @@ export function MealTrackerApp() {
                         <p className="mt-2 text-sm leading-6 text-clay-500">
                           Maintenance estimate {plannerPreview.maintenanceCalories} kcal.
                           Recommended daily intake {plannerPreview.targetCalories} kcal.
+                          Treat this as a starting point, then adjust after you get a
+                          week or two of real tracking data.
                         </p>
                       </div>
                       <span className="rounded-full border border-sage-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sage-700">
@@ -2404,7 +2486,12 @@ export function MealTrackerApp() {
 
         {dashboard && dashboard.meals.length === 0 ? (
           <div className="mt-6 rounded-[24px] border border-dashed border-clay-200 bg-white/60 px-6 py-10 text-center text-sm text-clay-500">
-            No meals are logged for this day yet. Analyze a meal and save it here.
+            <p className="text-base font-semibold text-clay-900">No meals logged yet.</p>
+            <p className="mt-3 leading-6">
+              Start with the goal settings if you want to dial in calories and macros,
+              then upload a meal photo, add a short description, and save your first log
+              here.
+            </p>
           </div>
         ) : null}
 
