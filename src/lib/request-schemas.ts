@@ -49,6 +49,15 @@ export const signInSchema = z.object({
   password: authPasswordSchema,
 });
 
+export const forgotPasswordSchema = z.object({
+  email: authEmailSchema,
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(20, "The reset link is missing a valid token."),
+  password: authPasswordSchema,
+});
+
 export const createMealLogSchema = z.object({
   description: z.string().trim().min(2).max(300),
   mealType: mealTypeSchema,

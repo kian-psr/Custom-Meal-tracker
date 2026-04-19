@@ -55,15 +55,16 @@ enum MacroPreference {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  name         String?
-  passwordHash String
-  settings     UserSettings?
-  sessions     Session[]
-  meals        MealLog[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  name                String?
+  passwordHash        String
+  settings            UserSettings?
+  sessions            Session[]
+  meals               MealLog[]
+  passwordResetTokens PasswordResetToken[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 }
 
 model Session {
@@ -71,6 +72,18 @@ model Session {
   tokenHash String   @unique
   userId    String
   expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

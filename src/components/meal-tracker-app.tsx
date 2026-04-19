@@ -1,6 +1,7 @@
 "use client";
 
 import { clsx } from "clsx";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
@@ -361,11 +362,11 @@ function AuthPanel({
       <div className="rounded-[28px] bg-gradient-to-br from-clay-900 via-clay-900 to-sage-900 p-6 text-white">
         <p className="section-label !text-clay-200">Private Tracking</p>
         <h2 className="mt-3 text-3xl leading-tight">
-          Create an account so every meal log, target, and photo stays yours.
+          Keep every meal log, target, and photo tied to your own account.
         </h2>
         <p className="mt-4 max-w-xl text-sm leading-7 text-clay-100">
-          This app now keeps data per user instead of sharing one public log. Sign in
-          from your phone or laptop and you’ll land in the same private dashboard.
+          Sign in from your phone or laptop and you’ll come back to the same private
+          dashboard, not a shared public log.
         </p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -449,6 +450,17 @@ function AuthPanel({
             />
           </label>
 
+          {mode === "sign-in" ? (
+            <div className="flex justify-end">
+              <Link
+                className="text-sm font-semibold text-clay-700 underline transition hover:text-clay-900"
+                href="/forgot-password"
+              >
+                Forgot your password?
+              </Link>
+            </div>
+          ) : null}
+
           {error ? (
             <div className="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
               {error}
@@ -472,7 +484,7 @@ function AuthPanel({
 
         <p className="mt-4 text-sm leading-6 text-clay-500">
           {mode === "sign-up"
-            ? "Your account starts with starter targets and an empty private meal log."
+            ? "Your account starts with starter targets, and you can switch to the guided goal calculator anytime."
             : "Use the same email and password from any device to reach your personal dashboard."}
         </p>
       </div>
@@ -1315,7 +1327,7 @@ export function MealTrackerApp() {
                   </p>
                   <p className="mt-1 text-sm text-clay-500">
                     Sign in below to keep meals, targets, and saved photos attached to
-                    your own account.
+                    your own account instead of a shared log.
                   </p>
                 </div>
               )}
@@ -1333,7 +1345,7 @@ export function MealTrackerApp() {
               </div>
               <div className="rounded-[22px] border border-white/60 bg-white/70 p-4">
                 <p className="section-label">
-                  {sessionUser ? "Photo Memory" : "Account Access"}
+                  {sessionUser ? "Saved Photos" : "Account Access"}
                 </p>
                 <p className="mt-3 text-3xl font-semibold text-clay-900">
                   {sessionUser
@@ -1480,7 +1492,7 @@ export function MealTrackerApp() {
                 <div>
                   <p className="section-label">Meal Image</p>
                   <p className="mt-3 text-lg font-medium text-clay-900">
-                    {selectedImage ? selectedImage.name : "Tap to upload a plate shot"}
+                    {selectedImage ? selectedImage.name : "Upload a meal photo"}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-clay-500">
                     JPG, PNG, or WebP up to 8 MB. Saved meals keep the original image.
@@ -1536,11 +1548,12 @@ export function MealTrackerApp() {
                     className="mt-3 min-h-40 w-full rounded-[24px] border border-clay-200 bg-white px-4 py-4 text-base text-clay-900 outline-none transition placeholder:text-clay-400 focus:border-ember-500"
                     id="description"
                     onChange={(event) => setDescription(event.target.value)}
-                    placeholder="steak, peppers, mozzarella, 1 tsp olive oil"
+                    placeholder="Briefly describe the meal, key ingredients, sauces, cooking fats, or portion clues."
                     value={description}
                   />
                   <p className="mt-2 text-sm text-clay-500">
-                    Ingredients, fats, sauces, and portion clues all help the estimate.
+                    A short description of ingredients, sauces, cooking fats, and portion
+                    clues helps the estimate make more sense.
                   </p>
                 </div>
               </div>
@@ -2073,8 +2086,8 @@ export function MealTrackerApp() {
                     />
                     <p className="mt-2 text-sm leading-6 text-clay-500">
                       {plannerDraft.weightUnit === "KG"
-                        ? "Typical adult range: about 30 to 400 kg. If you meant pounds, switch the unit."
-                        : "Typical adult range: about 66 to 900 lb. If you meant kilograms, switch the unit."}
+                        ? "Most adults will land somewhere between roughly 30 and 400 kg. Use whichever unit you normally track in."
+                        : "Most adults will land somewhere between roughly 66 and 900 lb. Use whichever unit you normally track in."}
                     </p>
                   </div>
 
@@ -2118,8 +2131,8 @@ export function MealTrackerApp() {
                     />
                     <p className="mt-2 text-sm leading-6 text-clay-500">
                       {plannerDraft.heightUnit === "CM"
-                        ? "Typical adult range: about 100 to 260 cm. If you meant inches, switch the unit."
-                        : "Typical adult range: about 40 to 102 in. If you meant centimeters, switch the unit."}
+                        ? "For most adults this will usually fall between about 100 and 260 cm."
+                        : "For most adults this will usually fall between about 40 and 102 inches."}
                     </p>
                   </div>
                 </div>

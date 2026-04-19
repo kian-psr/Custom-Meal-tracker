@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
-  title: "Cutting Meal Macro Tracker",
+  title: "Meal Macro Tracker",
   description:
-    "Upload a meal photo, describe it, and keep a running daily macro total for a cutting phase.",
+    "Upload a meal photo, describe it, and keep a running daily calorie and macro total against personalized targets.",
 };
 
 export default function RootLayout({
@@ -19,4 +19,3 @@ export default function RootLayout({
     </html>
   );
 }
-

@@ -18,8 +18,12 @@ type SessionUserRecord = {
 };
 
 function hashSessionToken(token: string) {
+  return hashScopedToken(token, "session");
+}
+
+export function hashScopedToken(token: string, scope: string) {
   return createHash("sha256")
-    .update(`${token}:${serverEnv.AUTH_SECRET}`)
+    .update(`${scope}:${token}:${serverEnv.AUTH_SECRET}`)
     .digest("hex");
 }
 
@@ -116,6 +120,14 @@ export async function deleteSessionByToken(token: string | null) {
   });
 }
 
+export async function deleteAllSessionsForUser(userId: string) {
+  await prisma.session.deleteMany({
+    where: {
+      userId,
+    },
+  });
+}
+
 export function createSessionCookie(token: string, expiresAt: Date) {
   const parts = [
     `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
@@ -199,3 +211,5 @@ export async function getAuthenticatedSession(
     user: mapAuthUser(session.user),
   };
 }
+
+export { SESSION_TTL_DAYS };

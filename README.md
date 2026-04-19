@@ -12,6 +12,7 @@ A local-first meal tracking app that uses a meal photo plus a short description 
 - Daily log with edit and delete support
 - Manual daily targets saved in the database
 - Guided goal calculator with age, sex, height, weight, activity, cut/maintain/bulk, and macro preferences
+- Password reset flow with secure email links
 - Date navigation for past days
 - Seven-day history and weekly trend summary
 - SQLite storage through Prisma
@@ -39,6 +40,12 @@ OPENAI_API_KEY=""
 OPENAI_MEAL_MODEL="gpt-4.1"
 MOCK_OPENAI_ANALYSIS="true"
 MEAL_PHOTO_STORAGE_DIR=""
+SMTP_HOST=""
+SMTP_PORT=""
+SMTP_SECURE="false"
+SMTP_USER=""
+SMTP_PASS=""
+SMTP_FROM=""
 ```
 
 ### Live mode vs fallback mode
@@ -134,6 +141,12 @@ ADMIN_EMAILS=you@example.com
 OPENAI_API_KEY=your_real_key
 OPENAI_MEAL_MODEL=gpt-4.1
 MOCK_OPENAI_ANALYSIS=false
+SMTP_HOST=your-smtp-host
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-smtp-user
+SMTP_PASS=your-smtp-password
+SMTP_FROM="Meal Macro Tracker <no-reply@yourdomain.com>"
 ```
 
 Optional:
@@ -220,6 +233,8 @@ The production startup script now refuses to boot on Railway if `DATABASE_URL` p
 
 - Sign up and sign in use email/password credentials
 - Sessions are stored with secure HttpOnly cookies
+- Password reset uses single-use, time-limited reset tokens
+- Password reset emails require SMTP variables to be configured in production
 - Each `MealLog`, `UserSettings`, and saved meal photo belongs to one user
 - Older global rows without a user stay hidden and do not appear in signed-in dashboards
 
@@ -254,7 +269,7 @@ The production startup script now refuses to boot on Railway if `DATABASE_URL` p
 
 ## Current Limitations
 
-- There is still no password reset or email verification flow
+- There is still no email verification flow
 - SQLite is fine for this MVP, but not the right long-term choice for a larger multi-user product
 - Admin access currently depends on a simple email allowlist via `ADMIN_EMAILS`
 - Photo analysis quality depends on the API key, model availability, and image quality
