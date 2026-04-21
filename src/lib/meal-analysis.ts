@@ -1,6 +1,7 @@
 import "server-only";
 
 import OpenAI from "openai";
+import { ZodError } from "zod";
 
 import {
   mealAnalysisJsonSchema,
@@ -164,7 +165,14 @@ export async function analyzeMeal(input: AnalyzeMealInput): Promise<{
   try {
     return await analyzeWithOpenAI(input);
   } catch (error) {
-    console.error("OpenAI meal analysis failed, falling back to local heuristic mode.", error);
+    if (error instanceof ZodError) {
+      console.error(
+        "OpenAI meal analysis failed validation, falling back to local heuristic mode.",
+        JSON.stringify(error.issues, null, 2)
+      );
+    } else {
+      console.error("OpenAI meal analysis failed, falling back to local heuristic mode.", error);
+    }
 
     return {
       analysis: createMockMealAnalysis({

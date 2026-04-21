@@ -145,22 +145,32 @@ export const mealAnalysisJsonSchema = {
   properties: {
     meal_name: {
       type: "string",
+      minLength: 1,
+      maxLength: 80,
       description: "A concise name for the meal as eaten.",
     },
     estimated_calories: {
       type: "integer",
+      minimum: 0,
+      maximum: 4000,
       description: "Estimated total calories for the whole meal.",
     },
     protein_g: {
       type: "number",
+      minimum: 0,
+      maximum: 300,
       description: "Estimated grams of protein in the meal.",
     },
     carbs_g: {
       type: "number",
+      minimum: 0,
+      maximum: 300,
       description: "Estimated grams of carbohydrate in the meal.",
     },
     fat_g: {
       type: "number",
+      minimum: 0,
+      maximum: 200,
       description: "Estimated grams of fat in the meal.",
     },
     micronutrients: {
@@ -171,42 +181,62 @@ export const mealAnalysisJsonSchema = {
       properties: {
         sugar_g: {
           type: "number",
+          minimum: 0,
+          maximum: 250,
           description: "Estimated total sugar in grams.",
         },
         fiber_g: {
           type: "number",
+          minimum: 0,
+          maximum: 120,
           description: "Estimated total fiber in grams.",
         },
         sodium_mg: {
           type: "number",
+          minimum: 0,
+          maximum: 12000,
           description: "Estimated sodium in milligrams.",
         },
         potassium_mg: {
           type: "number",
+          minimum: 0,
+          maximum: 12000,
           description: "Estimated potassium in milligrams.",
         },
         calcium_mg: {
           type: "number",
+          minimum: 0,
+          maximum: 5000,
           description: "Estimated calcium in milligrams.",
         },
         iron_mg: {
           type: "number",
+          minimum: 0,
+          maximum: 100,
           description: "Estimated iron in milligrams.",
         },
         vitamin_c_mg: {
           type: "number",
+          minimum: 0,
+          maximum: 3000,
           description: "Estimated vitamin C in milligrams.",
         },
         vitamin_a_mcg: {
           type: "number",
+          minimum: 0,
+          maximum: 12000,
           description: "Estimated vitamin A in micrograms.",
         },
         vitamin_d_mcg: {
           type: "number",
+          minimum: 0,
+          maximum: 250,
           description: "Estimated vitamin D in micrograms.",
         },
         vitamin_b12_mcg: {
           type: "number",
+          minimum: 0,
+          maximum: 250,
           description: "Estimated vitamin B12 in micrograms.",
         },
       },
@@ -247,6 +277,8 @@ export const mealAnalysisJsonSchema = {
         "Key assumptions, especially portion size, hidden fats, and ambiguity from the photo.",
       items: {
         type: "string",
+        minLength: 1,
+        maxLength: 180,
       },
       minItems: 1,
       maxItems: 8,
@@ -263,24 +295,38 @@ export const mealAnalysisJsonSchema = {
         properties: {
           name: {
             type: "string",
+            minLength: 1,
+            maxLength: 60,
           },
           estimated_amount: {
             type: "string",
+            minLength: 1,
+            maxLength: 80,
           },
           calories: {
             type: "integer",
+            minimum: 0,
+            maximum: 2500,
           },
           protein_g: {
             type: "number",
+            minimum: 0,
+            maximum: 300,
           },
           carbs_g: {
             type: "number",
+            minimum: 0,
+            maximum: 300,
           },
           fat_g: {
             type: "number",
+            minimum: 0,
+            maximum: 200,
           },
           notes: {
             type: "string",
+            minLength: 1,
+            maxLength: 180,
           },
         },
         required: [
