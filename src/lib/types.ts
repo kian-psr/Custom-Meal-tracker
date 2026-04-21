@@ -3,6 +3,7 @@ import type {
   AnalyzedMeal,
   ConfidenceLabel,
   MealType,
+  Micronutrients,
 } from "@/lib/meal-analysis-schema";
 import type {
   GoalPlannerProfile,
@@ -127,6 +128,7 @@ export type MealLogRecord = {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  micronutrients: Micronutrients;
   confidence: {
     score: number;
     label: ConfidenceLabel;

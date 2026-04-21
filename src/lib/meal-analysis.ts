@@ -20,6 +20,10 @@ type AnalyzeMealInput = {
   targets: DailyTargets;
 };
 
+type ResponseReasoning = NonNullable<
+  Parameters<OpenAI["responses"]["create"]>[0]["reasoning"]
+>;
+
 let openAIClient: OpenAI | null = null;
 
 function getOpenAIClient() {
@@ -41,8 +45,23 @@ function buildPrompt(input: AnalyzeMealInput) {
     `Meal type: ${input.mealType}.`,
     `Description: ${input.description}.`,
     `Daily targets for context: ${input.targets.calories} kcal, ${input.targets.proteinG} g protein, ${input.targets.carbsG.min}-${input.targets.carbsG.max} g carbs, ${input.targets.fatG.min}-${input.targets.fatG.max} g fat.`,
-    "Estimate the meal conservatively for a cutting phase and prioritize protein accuracy.",
+    "Estimate calories, macros, and best-effort micronutrients for the meal.",
+    "Use the daily targets only as context and never force the estimate to fit the goals.",
+    "Be conservative with hidden oils, butter, cheese, sauces, sodium, and added sugar when they are plausible but unclear.",
+    "Prioritize total calories and protein accuracy over micronutrient precision.",
   ].join(" ");
+}
+
+function getReasoningConfig(model: string): ResponseReasoning | undefined {
+  if (/^gpt-5\.\d/.test(model)) {
+    return { effort: "none" } as unknown as ResponseReasoning;
+  }
+
+  if (/^gpt-5(?:$|-)/.test(model)) {
+    return { effort: "minimal" } as unknown as ResponseReasoning;
+  }
+
+  return undefined;
 }
 
 function extractResponseText(response: Awaited<ReturnType<OpenAI["responses"]["create"]>>) {
@@ -79,6 +98,7 @@ async function analyzeWithOpenAI(input: AnalyzeMealInput): Promise<{
 }> {
   const response = await getOpenAIClient().responses.create({
     model: serverEnv.OPENAI_MEAL_MODEL,
+    reasoning: getReasoningConfig(serverEnv.OPENAI_MEAL_MODEL),
     input: [
       {
         role: "system",
@@ -86,7 +106,7 @@ async function analyzeWithOpenAI(input: AnalyzeMealInput): Promise<{
           {
             type: "input_text",
             text:
-              "You are a sports nutrition analyst estimating calories and macros from a meal image plus a short ingredient description. Be conservative with hidden fats from oil, butter, cheese, dressings, and sauces. Prioritize protein estimation accuracy. Never pretend to be exact. The assumptions array must call out portion estimates, hidden ingredient risks, and ambiguity from the image. The estimated_components array should list the key ingredients that drove the estimate and use practical amount strings like 180 g chicken breast or 1 tsp olive oil.",
+              "You are a sports nutrition analyst estimating calories, macros, and best-effort micronutrients from a meal image plus a short ingredient description. Use the text to improve image understanding. Prioritize total calories and protein estimation accuracy, then carbs and fat, then micronutrients. Be conservative with hidden fats from oil, butter, cheese, dressings, sauces, and hidden sodium or added sugar when they are plausible but unclear. Never pretend to be exact. The micronutrients object must include realistic best-effort totals for sugar, fiber, sodium, potassium, calcium, iron, vitamin C, vitamin A, vitamin D, and vitamin B12. If the image does not support a confident vitamin estimate, stay modest rather than inventing a high number. The assumptions array must call out portion estimates, hidden ingredient risks, and ambiguity from the image. The estimated_components array should list the key ingredients that drove the estimate and use practical amount strings like 180 g chicken breast or 1 tsp olive oil.",
           },
         ],
       },
@@ -108,7 +128,7 @@ async function analyzeWithOpenAI(input: AnalyzeMealInput): Promise<{
     text: {
       format: {
         type: "json_schema",
-        name: "meal_macro_estimate",
+        name: "meal_nutrition_estimate",
         strict: true,
         schema: mealAnalysisJsonSchema,
       },

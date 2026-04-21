@@ -6,7 +6,7 @@ A local-first meal tracking app that uses a meal photo plus a short description 
 
 - Meal analysis from photo + short text description
 - Email/password accounts with private per-user dashboards
-- Structured macro estimate with confidence and assumptions
+- Structured macro and micronutrient estimate with confidence and assumptions
 - Editable review step before saving
 - Stored meal photos with private access per signed-in user
 - Daily log with edit and delete support
@@ -37,7 +37,7 @@ DATABASE_URL="file:./dev.db"
 AUTH_SECRET="replace-with-a-random-32-plus-character-secret"
 ADMIN_EMAILS="you@example.com"
 OPENAI_API_KEY=""
-OPENAI_MEAL_MODEL="gpt-4.1"
+OPENAI_MEAL_MODEL="gpt-5.4"
 MOCK_OPENAI_ANALYSIS="true"
 MEAL_PHOTO_STORAGE_DIR=""
 SMTP_HOST=""
@@ -53,6 +53,7 @@ SMTP_FROM=""
 - `MOCK_OPENAI_ANALYSIS="true"` forces local heuristic analysis and does not call OpenAI.
 - `MOCK_OPENAI_ANALYSIS="false"` uses the live OpenAI path when possible.
 - If live analysis fails because of quota or another API error, the app falls back to the local heuristic estimator and labels the result as fallback/demo mode instead of breaking the workflow.
+- The default live model is `gpt-5.4`. If you want a cheaper option, `gpt-5.4-mini` is a good swap through `OPENAI_MEAL_MODEL`.
 
 ## Install
 
@@ -139,7 +140,7 @@ DATABASE_URL=file:/data/dev.db
 AUTH_SECRET=use-a-long-random-secret-here
 ADMIN_EMAILS=you@example.com
 OPENAI_API_KEY=your_real_key
-OPENAI_MEAL_MODEL=gpt-4.1
+OPENAI_MEAL_MODEL=gpt-5.4
 MOCK_OPENAI_ANALYSIS=false
 SMTP_HOST=your-smtp-host
 SMTP_PORT=587

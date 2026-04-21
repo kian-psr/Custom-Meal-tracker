@@ -102,12 +102,13 @@ model MealLog {
   proteinG                Float
   carbsG                  Float
   fatG                    Float
+  micronutrientsJson      String   @default("{}")
   confidenceScore         Float
   confidenceLabel         String
   assumptionsJson         String
   estimatedComponentsJson String
   analysisSource          String   @default("openai")
-  analysisModel           String   @default("gpt-4.1")
+  analysisModel           String   @default("gpt-5.4")
   consumedAt              DateTime @default(now())
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
@@ -118,27 +119,27 @@ model MealLog {
 }
 
 model UserSettings {
-  id              String   @id @default(cuid())
-  userId          String?  @unique
-  targetMode      SettingsMode @default(MANUAL)
-  dailyCalories   Int
-  proteinTargetG  Float
-  carbTargetMinG  Float
-  carbTargetMaxG  Float
-  fatTargetMinG   Float
-  fatTargetMaxG   Float
-  goalSex         BiologicalSex?
-  ageYears        Int?
-  activityLevel   ActivityLevel?
-  goalPhase       GoalPhase?
-  weightUnit      WeightUnit?
-  heightUnit      HeightUnit?
-  weightKg        Float?
-  heightCm        Float?
+  id                String           @id @default(cuid())
+  userId            String?          @unique
+  targetMode        SettingsMode     @default(MANUAL)
+  dailyCalories     Int
+  proteinTargetG    Float
+  carbTargetMinG    Float
+  carbTargetMaxG    Float
+  fatTargetMinG     Float
+  fatTargetMaxG     Float
+  goalSex           BiologicalSex?
+  ageYears          Int?
+  activityLevel     ActivityLevel?
+  goalPhase         GoalPhase?
+  weightUnit        WeightUnit?
+  heightUnit        HeightUnit?
+  weightKg          Float?
+  heightCm          Float?
   proteinPreference MacroPreference?
   carbPreference    MacroPreference?
   fatPreference     MacroPreference?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  user              User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

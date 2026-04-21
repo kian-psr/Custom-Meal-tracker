@@ -1,10 +1,26 @@
-import { normalizeAnalysis, type MealType } from "@/lib/meal-analysis-schema";
+import {
+  createEmptyMicronutrients,
+  normalizeAnalysis,
+  type Micronutrients,
+  type MealType,
+} from "@/lib/meal-analysis-schema";
 
 type MacroSet = {
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
+};
+
+type ComponentEstimate = {
+  name: string;
+  estimatedAmount: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  micronutrients: Micronutrients;
+  notes: string;
 };
 
 type FoodRule = {
@@ -15,6 +31,188 @@ type FoodRule = {
   macros: MacroSet;
   notes: string;
   assumption: string;
+};
+
+function buildMicronutrients(partial: Partial<Micronutrients>): Micronutrients {
+  return {
+    ...createEmptyMicronutrients(),
+    ...partial,
+  };
+}
+
+const FOOD_MICRONUTRIENTS: Record<string, Micronutrients> = {
+  steak: buildMicronutrients({
+    sodiumMg: 115,
+    potassiumMg: 620,
+    calciumMg: 25,
+    ironMg: 3.8,
+    vitaminDMcg: 0.2,
+    vitaminB12Mcg: 2.2,
+  }),
+  "chicken breast": buildMicronutrients({
+    sodiumMg: 125,
+    potassiumMg: 460,
+    calciumMg: 18,
+    ironMg: 1,
+    vitaminAMcg: 6,
+    vitaminDMcg: 0.1,
+    vitaminB12Mcg: 0.4,
+  }),
+  salmon: buildMicronutrients({
+    sodiumMg: 95,
+    potassiumMg: 620,
+    calciumMg: 18,
+    ironMg: 0.7,
+    vitaminDMcg: 13,
+    vitaminB12Mcg: 5.3,
+  }),
+  eggs: buildMicronutrients({
+    sugarG: 0.8,
+    sodiumMg: 140,
+    potassiumMg: 138,
+    calciumMg: 56,
+    ironMg: 1.8,
+    vitaminAMcg: 160,
+    vitaminDMcg: 2,
+    vitaminB12Mcg: 1.1,
+  }),
+  rice: buildMicronutrients({
+    sugarG: 0.1,
+    fiberG: 0.6,
+    sodiumMg: 2,
+    potassiumMg: 50,
+    calciumMg: 12,
+    ironMg: 0.3,
+  }),
+  potato: buildMicronutrients({
+    sugarG: 2,
+    fiberG: 4,
+    sodiumMg: 14,
+    potassiumMg: 840,
+    calciumMg: 24,
+    ironMg: 1.3,
+    vitaminCMg: 20,
+    vitaminAMcg: 2,
+  }),
+  oats: buildMicronutrients({
+    sugarG: 0.4,
+    fiberG: 4.2,
+    sodiumMg: 2,
+    potassiumMg: 140,
+    calciumMg: 22,
+    ironMg: 1.7,
+  }),
+  "greek yogurt": buildMicronutrients({
+    sugarG: 9,
+    sodiumMg: 90,
+    potassiumMg: 350,
+    calciumMg: 275,
+    vitaminB12Mcg: 1.1,
+  }),
+  banana: buildMicronutrients({
+    sugarG: 14,
+    fiberG: 3.1,
+    sodiumMg: 1,
+    potassiumMg: 422,
+    calciumMg: 6,
+    ironMg: 0.3,
+    vitaminCMg: 10.3,
+    vitaminAMcg: 4,
+  }),
+  berries: buildMicronutrients({
+    sugarG: 5.5,
+    fiberG: 2.8,
+    sodiumMg: 1,
+    potassiumMg: 120,
+    calciumMg: 14,
+    ironMg: 0.4,
+    vitaminCMg: 32,
+    vitaminAMcg: 8,
+  }),
+  mozzarella: buildMicronutrients({
+    sugarG: 0.7,
+    sodiumMg: 190,
+    potassiumMg: 24,
+    calciumMg: 220,
+    ironMg: 0.2,
+    vitaminAMcg: 95,
+    vitaminB12Mcg: 0.6,
+  }),
+  cheese: buildMicronutrients({
+    sugarG: 0.3,
+    sodiumMg: 180,
+    potassiumMg: 22,
+    calciumMg: 180,
+    ironMg: 0.2,
+    vitaminAMcg: 100,
+    vitaminB12Mcg: 0.4,
+  }),
+  "olive oil": buildMicronutrients({}),
+  avocado: buildMicronutrients({
+    sugarG: 0.5,
+    fiberG: 4.7,
+    sodiumMg: 5,
+    potassiumMg: 340,
+    calciumMg: 10,
+    ironMg: 0.4,
+    vitaminCMg: 7,
+    vitaminAMcg: 5,
+  }),
+  peppers: buildMicronutrients({
+    sugarG: 4.2,
+    fiberG: 2.1,
+    sodiumMg: 3,
+    potassiumMg: 210,
+    calciumMg: 10,
+    ironMg: 0.3,
+    vitaminCMg: 120,
+    vitaminAMcg: 160,
+  }),
+  broccoli: buildMicronutrients({
+    sugarG: 1.7,
+    fiberG: 3.3,
+    sodiumMg: 33,
+    potassiumMg: 316,
+    calciumMg: 47,
+    ironMg: 0.7,
+    vitaminCMg: 89,
+    vitaminAMcg: 31,
+  }),
+  salad: buildMicronutrients({
+    sugarG: 1.2,
+    fiberG: 2,
+    sodiumMg: 28,
+    potassiumMg: 210,
+    calciumMg: 70,
+    ironMg: 1.2,
+    vitaminCMg: 10,
+    vitaminAMcg: 250,
+  }),
+  bread: buildMicronutrients({
+    sugarG: 3,
+    fiberG: 2,
+    sodiumMg: 280,
+    potassiumMg: 80,
+    calciumMg: 60,
+    ironMg: 1.5,
+  }),
+  tortilla: buildMicronutrients({
+    sugarG: 1.4,
+    fiberG: 1.5,
+    sodiumMg: 330,
+    potassiumMg: 80,
+    calciumMg: 90,
+    ironMg: 1.4,
+  }),
+  beans: buildMicronutrients({
+    sugarG: 0.5,
+    fiberG: 9,
+    sodiumMg: 5,
+    potassiumMg: 430,
+    calciumMg: 46,
+    ironMg: 2.5,
+    vitaminCMg: 2,
+  }),
 };
 
 const FOOD_RULES: FoodRule[] = [
@@ -296,6 +494,41 @@ function roundToSingleDecimal(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+function scaleMicronutrients(micronutrients: Micronutrients, multiplier: number): Micronutrients {
+  return {
+    sugarG: roundToSingleDecimal(micronutrients.sugarG * multiplier),
+    fiberG: roundToSingleDecimal(micronutrients.fiberG * multiplier),
+    sodiumMg: roundToSingleDecimal(micronutrients.sodiumMg * multiplier),
+    potassiumMg: roundToSingleDecimal(micronutrients.potassiumMg * multiplier),
+    calciumMg: roundToSingleDecimal(micronutrients.calciumMg * multiplier),
+    ironMg: roundToSingleDecimal(micronutrients.ironMg * multiplier),
+    vitaminCMg: roundToSingleDecimal(micronutrients.vitaminCMg * multiplier),
+    vitaminAMcg: roundToSingleDecimal(micronutrients.vitaminAMcg * multiplier),
+    vitaminDMcg: roundToSingleDecimal(micronutrients.vitaminDMcg * multiplier),
+    vitaminB12Mcg: roundToSingleDecimal(micronutrients.vitaminB12Mcg * multiplier),
+  };
+}
+
+function addMicronutrients(
+  current: Micronutrients,
+  addition: Micronutrients
+): Micronutrients {
+  return {
+    sugarG: roundToSingleDecimal(current.sugarG + addition.sugarG),
+    fiberG: roundToSingleDecimal(current.fiberG + addition.fiberG),
+    sodiumMg: roundToSingleDecimal(current.sodiumMg + addition.sodiumMg),
+    potassiumMg: roundToSingleDecimal(current.potassiumMg + addition.potassiumMg),
+    calciumMg: roundToSingleDecimal(current.calciumMg + addition.calciumMg),
+    ironMg: roundToSingleDecimal(current.ironMg + addition.ironMg),
+    vitaminCMg: roundToSingleDecimal(current.vitaminCMg + addition.vitaminCMg),
+    vitaminAMcg: roundToSingleDecimal(current.vitaminAMcg + addition.vitaminAMcg),
+    vitaminDMcg: roundToSingleDecimal(current.vitaminDMcg + addition.vitaminDMcg),
+    vitaminB12Mcg: roundToSingleDecimal(
+      current.vitaminB12Mcg + addition.vitaminB12Mcg
+    ),
+  };
+}
+
 function titleCase(input: string) {
   return input
     .split(/\s+/)
@@ -326,9 +559,10 @@ export function createMockMealAnalysis(input: {
   const description = input.description.toLowerCase();
   const assumptions = new Set<string>([
     "Demo mode is enabled, so this estimate uses text heuristics instead of live image analysis.",
+    "Micronutrient detail is best-effort and usually less reliable than calories and macros in demo mode.",
   ]);
 
-  const estimatedComponents = FOOD_RULES.flatMap((rule) => {
+  const estimatedComponents: ComponentEstimate[] = FOOD_RULES.flatMap((rule) => {
     const matchedKeyword = rule.keywords.find((keyword) => description.includes(keyword));
 
     if (!matchedKeyword) {
@@ -348,6 +582,10 @@ export function createMockMealAnalysis(input: {
         proteinG: roundToSingleDecimal(rule.macros.protein * multiplier),
         carbsG: roundToSingleDecimal(rule.macros.carbs * multiplier),
         fatG: roundToSingleDecimal(rule.macros.fat * multiplier),
+        micronutrients: scaleMicronutrients(
+          FOOD_MICRONUTRIENTS[rule.keywords[0]] ?? createEmptyMicronutrients(),
+          multiplier
+        ),
         notes: rule.notes,
       },
     ];
@@ -368,6 +606,18 @@ export function createMockMealAnalysis(input: {
             proteinG: 35,
             carbsG: 35,
             fatG: 22,
+            micronutrients: buildMicronutrients({
+              sugarG: 6,
+              fiberG: 5,
+              sodiumMg: 620,
+              potassiumMg: 620,
+              calciumMg: 120,
+              ironMg: 2.4,
+              vitaminCMg: 18,
+              vitaminAMcg: 120,
+              vitaminDMcg: 0.6,
+              vitaminB12Mcg: 1.1,
+            }),
             notes: "Fallback estimate for an unrecognized mixed meal.",
           },
         ];
@@ -382,12 +632,14 @@ export function createMockMealAnalysis(input: {
       proteinG: accumulator.proteinG + component.proteinG,
       carbsG: accumulator.carbsG + component.carbsG,
       fatG: accumulator.fatG + component.fatG,
+      micronutrients: addMicronutrients(accumulator.micronutrients, component.micronutrients),
     }),
     {
       calories: 0,
       proteinG: 0,
       carbsG: 0,
       fatG: 0,
+      micronutrients: createEmptyMicronutrients(),
     }
   );
 
@@ -408,6 +660,18 @@ export function createMockMealAnalysis(input: {
     protein_g: totals.proteinG,
     carbs_g: totals.carbsG,
     fat_g: totals.fatG,
+    micronutrients: {
+      sugar_g: totals.micronutrients.sugarG,
+      fiber_g: totals.micronutrients.fiberG,
+      sodium_mg: totals.micronutrients.sodiumMg,
+      potassium_mg: totals.micronutrients.potassiumMg,
+      calcium_mg: totals.micronutrients.calciumMg,
+      iron_mg: totals.micronutrients.ironMg,
+      vitamin_c_mg: totals.micronutrients.vitaminCMg,
+      vitamin_a_mcg: totals.micronutrients.vitaminAMcg,
+      vitamin_d_mcg: totals.micronutrients.vitaminDMcg,
+      vitamin_b12_mcg: totals.micronutrients.vitaminB12Mcg,
+    },
     confidence: {
       score: confidenceScore,
       label: confidenceLabel,

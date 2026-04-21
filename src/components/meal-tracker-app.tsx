@@ -98,6 +98,23 @@ const SETTINGS_MODE_LABELS: Record<SettingsMode, string> = {
   GUIDED: "Goal calculator",
 };
 
+const MICRONUTRIENT_FIELDS: Array<{
+  key: keyof MealAnalysisResponse["analysis"]["micronutrients"];
+  label: string;
+  helper: string;
+}> = [
+  { key: "sugarG", label: "Sugar", helper: "grams" },
+  { key: "fiberG", label: "Fiber", helper: "grams" },
+  { key: "sodiumMg", label: "Sodium", helper: "mg" },
+  { key: "potassiumMg", label: "Potassium", helper: "mg" },
+  { key: "calciumMg", label: "Calcium", helper: "mg" },
+  { key: "ironMg", label: "Iron", helper: "mg" },
+  { key: "vitaminCMg", label: "Vit C", helper: "mg" },
+  { key: "vitaminAMcg", label: "Vit A", helper: "mcg" },
+  { key: "vitaminDMcg", label: "Vit D", helper: "mcg" },
+  { key: "vitaminB12Mcg", label: "B12", helper: "mcg" },
+];
+
 type ReviewDraft = {
   mealName: string;
   estimatedCalories: string;
@@ -559,6 +576,33 @@ function MacroStrip({
   );
 }
 
+function MicronutrientStrip({
+  micronutrients,
+  note,
+}: {
+  micronutrients: MealAnalysisResponse["analysis"]["micronutrients"];
+  note?: string;
+}) {
+  return (
+    <div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {MICRONUTRIENT_FIELDS.map((field) => (
+          <MetricChip
+            key={field.key}
+            helper={field.helper}
+            label={field.label}
+            value={formatMacroValue(micronutrients[field.key])}
+          />
+        ))}
+      </div>
+
+      {note ? (
+        <p className="mt-3 text-sm leading-6 text-clay-500">{note}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function PhotoFrame({
   photoUrl,
   alt,
@@ -980,6 +1024,7 @@ export function MealTrackerApp() {
           proteinG: Number(reviewDraft.proteinG),
           carbsG: Number(reviewDraft.carbsG),
           fatG: Number(reviewDraft.fatG),
+          micronutrients: analysisResponse.analysis.micronutrients,
           confidence: analysisResponse.analysis.confidence,
           assumptions,
           estimatedComponents: analysisResponse.analysis.estimatedComponents,
@@ -1571,7 +1616,7 @@ export function MealTrackerApp() {
                 disabled={isAnalyzing}
                 type="submit"
               >
-                {isAnalyzing ? "Analyzing meal..." : "Estimate macros"}
+                {isAnalyzing ? "Analyzing meal..." : "Estimate nutrition"}
               </button>
 
               <button
@@ -1762,6 +1807,16 @@ export function MealTrackerApp() {
                   fatG={Number(reviewDraft.fatG) || 0}
                   proteinG={Number(reviewDraft.proteinG) || 0}
                 />
+              </div>
+
+              <div className="mt-5">
+                <p className="section-label">Estimated Micronutrients</p>
+                <div className="mt-3">
+                  <MicronutrientStrip
+                    micronutrients={analysisResponse.analysis.micronutrients}
+                    note="Micronutrients are best-effort estimates from the photo and description. If you manually adjust macros here, these values stay tied to the model estimate."
+                  />
+                </div>
               </div>
             </div>
           ) : null}
@@ -2582,6 +2637,13 @@ export function MealTrackerApp() {
                       />
                     </div>
 
+                    <div className="mt-5">
+                      <p className="section-label">Estimated Micronutrients</p>
+                      <div className="mt-3">
+                        <MicronutrientStrip micronutrients={meal.micronutrients} />
+                      </div>
+                    </div>
+
                     {isEditingMeal && editDraft ? (
                       <div className="mt-5 rounded-[24px] border border-clay-200 bg-clay-50/70 p-5">
                         <p className="section-label">Edit Meal</p>
@@ -2743,6 +2805,12 @@ export function MealTrackerApp() {
                             </label>
                           </div>
                         </div>
+
+                        <p className="mt-5 text-sm leading-6 text-clay-500">
+                          Micronutrient details stay linked to the original estimate for now, so
+                          editing this form only changes calories, macros, assumptions, and log
+                          time.
+                        </p>
 
                         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                           <button

@@ -6,6 +6,8 @@ import {
   type AnalysisSource,
   type AnalyzedMeal,
   type MealType,
+  type Micronutrients,
+  createEmptyMicronutrients,
 } from "@/lib/meal-analysis-schema";
 import {
   buildCutStatus,
@@ -22,6 +24,13 @@ function parseJson<T>(value: string): T {
   return JSON.parse(value) as T;
 }
 
+function parseMicronutrients(value: string): Micronutrients {
+  return {
+    ...createEmptyMicronutrients(),
+    ...parseJson<Partial<Micronutrients>>(value),
+  };
+}
+
 function mapMealLogRecord(record: MealLog): MealLogRecord {
   return {
     id: record.id,
@@ -34,6 +43,7 @@ function mapMealLogRecord(record: MealLog): MealLogRecord {
     proteinG: record.proteinG,
     carbsG: record.carbsG,
     fatG: record.fatG,
+    micronutrients: parseMicronutrients(record.micronutrientsJson),
     confidence: {
       score: record.confidenceScore,
       label: record.confidenceLabel as MealLogRecord["confidence"]["label"],
@@ -133,6 +143,7 @@ export async function createMealLog(input: {
       proteinG: input.analysis.proteinG,
       carbsG: input.analysis.carbsG,
       fatG: input.analysis.fatG,
+      micronutrientsJson: JSON.stringify(input.analysis.micronutrients),
       confidenceScore: input.analysis.confidence.score,
       confidenceLabel: input.analysis.confidence.label,
       assumptionsJson: JSON.stringify(input.analysis.assumptions),

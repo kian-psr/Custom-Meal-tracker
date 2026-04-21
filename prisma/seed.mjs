@@ -62,11 +62,37 @@ async function main() {
     "No added honey or nut butter was included.",
   ];
 
+  const breakfastMicronutrients = {
+    sugarG: 28,
+    fiberG: 8,
+    sodiumMg: 95,
+    potassiumMg: 860,
+    calciumMg: 345,
+    ironMg: 2.6,
+    vitaminCMg: 26,
+    vitaminAMcg: 82,
+    vitaminDMcg: 0.3,
+    vitaminB12Mcg: 1.1,
+  };
+
   const lunchAssumptions = [
     "Assumed 180 g cooked chicken breast.",
     "Assumed 150 g cooked rice and 1 tsp olive oil.",
     "Vegetables were treated as lightly cooked with minimal sauce.",
   ];
+
+  const lunchMicronutrients = {
+    sugarG: 2.4,
+    fiberG: 4.6,
+    sodiumMg: 145,
+    potassiumMg: 940,
+    calciumMg: 78,
+    ironMg: 2.2,
+    vitaminCMg: 79,
+    vitaminAMcg: 58,
+    vitaminDMcg: 0.2,
+    vitaminB12Mcg: 0.5,
+  };
 
   await prisma.mealLog.createMany({
     data: [
@@ -79,6 +105,7 @@ async function main() {
         proteinG: 34,
         carbsG: 54,
         fatG: 7,
+        micronutrientsJson: JSON.stringify(breakfastMicronutrients),
         confidenceScore: 0.8,
         confidenceLabel: "high",
         assumptionsJson: JSON.stringify(breakfastAssumptions),
@@ -124,6 +151,7 @@ async function main() {
         proteinG: 58,
         carbsG: 42,
         fatG: 14,
+        micronutrientsJson: JSON.stringify(lunchMicronutrients),
         confidenceScore: 0.77,
         confidenceLabel: "medium",
         assumptionsJson: JSON.stringify(lunchAssumptions),
