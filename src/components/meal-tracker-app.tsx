@@ -1814,7 +1814,7 @@ export function MealTrackerApp() {
                 <div className="mt-3">
                   <MicronutrientStrip
                     micronutrients={analysisResponse.analysis.micronutrients}
-                    note="Micronutrients are best-effort estimates from the photo and description. If you manually adjust macros here, these values stay tied to the model estimate."
+                    note="Micronutrients are best-effort estimates from the photo and description. If you manually adjust totals here, these micronutrient values stay tied to the model estimate while the visible ingredient breakdown is rebalanced to match the saved calories and macros."
                   />
                 </div>
               </div>
@@ -2807,9 +2807,10 @@ export function MealTrackerApp() {
                         </div>
 
                         <p className="mt-5 text-sm leading-6 text-clay-500">
-                          Micronutrient details stay linked to the original estimate for now, so
-                          editing this form only changes calories, macros, assumptions, and log
-                          time.
+                          Micronutrient details stay linked to the original estimate for now. If
+                          you change calories or macros here, the ingredient breakdown is
+                          rebalanced proportionally so the displayed components still add up to
+                          the saved total.
                         </p>
 
                         <div className="mt-5 flex flex-col gap-3 sm:flex-row">

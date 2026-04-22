@@ -3,11 +3,14 @@ import type { MealLog } from "@prisma/client";
 import { getDayRange, getDateKey, isToday, listDateKeysEndingAt } from "@/lib/date";
 import { deleteMealPhoto } from "@/lib/file-storage";
 import {
+  appendBreakdownReconciledAssumption,
   type AnalysisSource,
   type AnalyzedMeal,
+  type EstimatedComponent,
   type MealType,
   type Micronutrients,
   createEmptyMicronutrients,
+  reconcileEstimatedComponents,
 } from "@/lib/meal-analysis-schema";
 import {
   buildCutStatus,
@@ -31,6 +34,10 @@ function parseMicronutrients(value: string): Micronutrients {
   };
 }
 
+function parseEstimatedComponents(value: string): EstimatedComponent[] {
+  return parseJson<EstimatedComponent[]>(value);
+}
+
 function mapMealLogRecord(record: MealLog): MealLogRecord {
   return {
     id: record.id,
@@ -49,9 +56,7 @@ function mapMealLogRecord(record: MealLog): MealLogRecord {
       label: record.confidenceLabel as MealLogRecord["confidence"]["label"],
     },
     assumptions: parseJson<string[]>(record.assumptionsJson),
-    estimatedComponents: parseJson<AnalyzedMeal["estimatedComponents"]>(
-      record.estimatedComponentsJson
-    ),
+    estimatedComponents: parseEstimatedComponents(record.estimatedComponentsJson),
     analysisSource: record.analysisSource as AnalysisSource,
     analysisModel: record.analysisModel,
     consumedAt: record.consumedAt.toISOString(),
@@ -131,6 +136,17 @@ export async function createMealLog(input: {
   photoUrl?: string | null;
   sourceImageName?: string | null;
 }) {
+  const reconciledComponents = reconcileEstimatedComponents(input.analysis.estimatedComponents, {
+    estimatedCalories: input.analysis.estimatedCalories,
+    proteinG: input.analysis.proteinG,
+    carbsG: input.analysis.carbsG,
+    fatG: input.analysis.fatG,
+  });
+  const assumptions = appendBreakdownReconciledAssumption(
+    input.analysis.assumptions,
+    reconciledComponents.didAdjust
+  );
+
   const createdRecord = await prisma.mealLog.create({
     data: {
       userId: input.userId,
@@ -146,8 +162,8 @@ export async function createMealLog(input: {
       micronutrientsJson: JSON.stringify(input.analysis.micronutrients),
       confidenceScore: input.analysis.confidence.score,
       confidenceLabel: input.analysis.confidence.label,
-      assumptionsJson: JSON.stringify(input.analysis.assumptions),
-      estimatedComponentsJson: JSON.stringify(input.analysis.estimatedComponents),
+      assumptionsJson: JSON.stringify(assumptions),
+      estimatedComponentsJson: JSON.stringify(reconciledComponents.components),
       analysisSource: input.analysisSource,
       analysisModel: input.analysisModel,
       consumedAt: input.consumedAt ? new Date(input.consumedAt) : new Date(),
@@ -180,6 +196,18 @@ export async function updateMealLog(
     return null;
   }
 
+  const existingComponents = parseEstimatedComponents(existing.estimatedComponentsJson);
+  const reconciledComponents = reconcileEstimatedComponents(existingComponents, {
+    estimatedCalories: input.estimatedCalories,
+    proteinG: input.proteinG,
+    carbsG: input.carbsG,
+    fatG: input.fatG,
+  });
+  const assumptions = appendBreakdownReconciledAssumption(
+    input.assumptions,
+    reconciledComponents.didAdjust
+  );
+
   const updatedRecord = await prisma.mealLog.update({
     where: { id },
     data: {
@@ -190,7 +218,8 @@ export async function updateMealLog(
       proteinG: input.proteinG,
       carbsG: input.carbsG,
       fatG: input.fatG,
-      assumptionsJson: JSON.stringify(input.assumptions),
+      assumptionsJson: JSON.stringify(assumptions),
+      estimatedComponentsJson: JSON.stringify(reconciledComponents.components),
       consumedAt: new Date(input.consumedAt),
     },
   });

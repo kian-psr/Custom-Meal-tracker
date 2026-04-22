@@ -84,6 +84,159 @@ function roundToSingleDecimal(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+function roundToWholeNumber(value: number) {
+  return Math.round(value);
+}
+
+function valuesDiffer(current: number, next: number, precision: number) {
+  return Math.abs(current - next) >= precision / 2;
+}
+
+function scaleValuesToTarget(
+  values: number[],
+  target: number,
+  precision: number
+) {
+  if (values.length === 0) {
+    return [];
+  }
+
+  const targetUnits = Math.max(0, roundToWholeNumber(target / precision));
+
+  if (targetUnits === 0) {
+    return values.map(() => 0);
+  }
+
+  const sum = values.reduce((total, value) => total + value, 0);
+
+  if (sum <= 0) {
+    return values.map((_, index) => (index === 0 ? targetUnits * precision : 0));
+  }
+
+  const scaledUnits = values.map((value) => (value / sum) * targetUnits);
+  const baseUnits = scaledUnits.map((value) => Math.floor(value));
+  const distributedUnits = [...baseUnits];
+  let unitsRemaining =
+    targetUnits - baseUnits.reduce((total, value) => total + value, 0);
+
+  const indicesByRemainder = scaledUnits
+    .map((value, index) => ({
+      index,
+      fractional: value - baseUnits[index],
+      original: values[index],
+    }))
+    .sort((left, right) => {
+      if (right.fractional !== left.fractional) {
+        return right.fractional - left.fractional;
+      }
+
+      if (right.original !== left.original) {
+        return right.original - left.original;
+      }
+
+      return left.index - right.index;
+    });
+
+  let cursor = 0;
+
+  while (unitsRemaining > 0) {
+    const targetIndex = indicesByRemainder[cursor % indicesByRemainder.length]?.index ?? 0;
+    distributedUnits[targetIndex] += 1;
+    unitsRemaining -= 1;
+    cursor += 1;
+  }
+
+  return distributedUnits.map((value) => value * precision);
+}
+
+export function sumEstimatedComponents(components: EstimatedComponent[]) {
+  return {
+    calories: components.reduce((total, component) => total + component.calories, 0),
+    proteinG: roundToSingleDecimal(
+      components.reduce((total, component) => total + component.proteinG, 0)
+    ),
+    carbsG: roundToSingleDecimal(
+      components.reduce((total, component) => total + component.carbsG, 0)
+    ),
+    fatG: roundToSingleDecimal(
+      components.reduce((total, component) => total + component.fatG, 0)
+    ),
+  };
+}
+
+export function reconcileEstimatedComponents(
+  components: EstimatedComponent[],
+  totals: {
+    estimatedCalories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+  }
+) {
+  if (components.length === 0) {
+    return {
+      components,
+      didAdjust: false,
+    };
+  }
+
+  const scaledCalories = scaleValuesToTarget(
+    components.map((component) => component.calories),
+    totals.estimatedCalories,
+    1
+  );
+  const scaledProtein = scaleValuesToTarget(
+    components.map((component) => component.proteinG),
+    totals.proteinG,
+    0.1
+  );
+  const scaledCarbs = scaleValuesToTarget(
+    components.map((component) => component.carbsG),
+    totals.carbsG,
+    0.1
+  );
+  const scaledFat = scaleValuesToTarget(
+    components.map((component) => component.fatG),
+    totals.fatG,
+    0.1
+  );
+
+  const nextComponents = components.map((component, index) => ({
+    ...component,
+    calories: roundToWholeNumber(scaledCalories[index] ?? 0),
+    proteinG: roundToSingleDecimal(scaledProtein[index] ?? 0),
+    carbsG: roundToSingleDecimal(scaledCarbs[index] ?? 0),
+    fatG: roundToSingleDecimal(scaledFat[index] ?? 0),
+  }));
+
+  const didAdjust = components.some((component, index) => {
+    const nextComponent = nextComponents[index];
+
+    return (
+      component.calories !== nextComponent.calories ||
+      valuesDiffer(component.proteinG, nextComponent.proteinG, 0.1) ||
+      valuesDiffer(component.carbsG, nextComponent.carbsG, 0.1) ||
+      valuesDiffer(component.fatG, nextComponent.fatG, 0.1)
+    );
+  });
+
+  return {
+    components: nextComponents,
+    didAdjust,
+  };
+}
+
+export function appendBreakdownReconciledAssumption(assumptions: string[], didAdjust: boolean) {
+  const note =
+    "The ingredient breakdown was rebalanced slightly so the displayed components add up to the saved total.";
+
+  if (!didAdjust || assumptions.includes(note)) {
+    return assumptions;
+  }
+
+  return [...assumptions, note].slice(0, 8);
+}
+
 export function createEmptyMicronutrients(): Micronutrients {
   return {
     sugarG: 0,
@@ -115,6 +268,22 @@ function normalizeMicronutrients(raw: z.infer<typeof rawMicronutrientsSchema>) {
 }
 
 export function normalizeAnalysis(raw: z.infer<typeof rawMealAnalysisSchema>) {
+  const normalizedComponents = raw.estimated_components.map((component) => ({
+    name: component.name.trim(),
+    estimatedAmount: component.estimated_amount.trim(),
+    calories: Math.round(component.calories),
+    proteinG: roundToSingleDecimal(component.protein_g),
+    carbsG: roundToSingleDecimal(component.carbs_g),
+    fatG: roundToSingleDecimal(component.fat_g),
+    notes: component.notes.trim(),
+  }));
+  const reconciledComponents = reconcileEstimatedComponents(normalizedComponents, {
+    estimatedCalories: Math.round(raw.estimated_calories),
+    proteinG: roundToSingleDecimal(raw.protein_g),
+    carbsG: roundToSingleDecimal(raw.carbs_g),
+    fatG: roundToSingleDecimal(raw.fat_g),
+  });
+
   return analyzedMealSchema.parse({
     mealName: raw.meal_name.trim(),
     estimatedCalories: Math.round(raw.estimated_calories),
@@ -126,16 +295,11 @@ export function normalizeAnalysis(raw: z.infer<typeof rawMealAnalysisSchema>) {
       score: roundToSingleDecimal(raw.confidence.score),
       label: raw.confidence.label,
     },
-    assumptions: raw.assumptions.map((assumption) => assumption.trim()),
-    estimatedComponents: raw.estimated_components.map((component) => ({
-      name: component.name.trim(),
-      estimatedAmount: component.estimated_amount.trim(),
-      calories: Math.round(component.calories),
-      proteinG: roundToSingleDecimal(component.protein_g),
-      carbsG: roundToSingleDecimal(component.carbs_g),
-      fatG: roundToSingleDecimal(component.fat_g),
-      notes: component.notes.trim(),
-    })),
+    assumptions: appendBreakdownReconciledAssumption(
+      raw.assumptions.map((assumption) => assumption.trim()),
+      reconciledComponents.didAdjust
+    ),
+    estimatedComponents: reconciledComponents.components,
   });
 }
 
@@ -359,3 +523,4 @@ export type ConfidenceLabel = z.infer<typeof confidenceLabelSchema>;
 export type AnalysisSource = z.infer<typeof analysisSourceSchema>;
 export type AnalyzedMeal = z.infer<typeof analyzedMealSchema>;
 export type Micronutrients = z.infer<typeof micronutrientsSchema>;
+export type EstimatedComponent = z.infer<typeof estimatedComponentSchema>;
