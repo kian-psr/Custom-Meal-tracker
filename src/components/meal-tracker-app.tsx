@@ -202,6 +202,56 @@ function rangeSummary(range: { min: number; max: number }) {
   return `Floor hit, ${range.max.toFixed(1)} g left before the ceiling`;
 }
 
+function micronutrientProgressWidth(
+  item: DailyDashboard["micronutrientOverview"]["items"][number]
+) {
+  if (item.goal <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.round((item.total / item.goal) * 100));
+}
+
+function micronutrientStatusSummary(
+  item: DailyDashboard["micronutrientOverview"]["items"][number]
+) {
+  const difference = Math.abs(item.goal - item.total);
+
+  if (item.goalType === "limit") {
+    if (item.total > item.goal) {
+      return {
+        tone: "alert" as const,
+        detail: `${formatMacroValue(difference)} ${item.unit} over the guide`,
+      };
+    }
+
+    return {
+      tone: "good" as const,
+      detail: `${formatMacroValue(difference)} ${item.unit} before the guide`,
+    };
+  }
+
+  if (item.total >= item.goal) {
+    return {
+      tone: "good" as const,
+      detail: "Goal reached",
+    };
+  }
+
+  return {
+    tone: "warn" as const,
+    detail: `${formatMacroValue(difference)} ${item.unit} to goal`,
+  };
+}
+
+function micronutrientGoalLabel(
+  item: DailyDashboard["micronutrientOverview"]["items"][number]
+) {
+  const prefix = item.goalType === "limit" ? "Guide" : "Goal";
+  const operator = item.goalType === "limit" ? "<=" : ">=";
+  return `${prefix} ${operator} ${formatMacroValue(item.goal)} ${item.unit}`;
+}
+
 function timeLabel(isoString: string) {
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -551,6 +601,52 @@ function MetricChip({
       <p className="text-xs uppercase tracking-[0.22em] text-clay-500">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-clay-900">{value}</p>
       <p className="mt-1 text-sm text-clay-500">{helper}</p>
+    </div>
+  );
+}
+
+function MicronutrientOverviewCard({
+  item,
+}: {
+  item: DailyDashboard["micronutrientOverview"]["items"][number];
+}) {
+  const status = micronutrientStatusSummary(item);
+  const toneClasses =
+    status.tone === "good"
+      ? "border-sage-200 bg-sage-50/80"
+      : status.tone === "alert"
+        ? "border-rose-200 bg-rose-50/80"
+        : "border-amber-200 bg-amber-50/80";
+  const barClasses =
+    status.tone === "good"
+      ? "bg-gradient-to-r from-sage-500 to-sage-400"
+      : status.tone === "alert"
+        ? "bg-gradient-to-r from-rose-500 to-rose-400"
+        : "bg-gradient-to-r from-amber-500 to-amber-400";
+
+  return (
+    <div className={clsx("rounded-[22px] border px-4 py-4", toneClasses)}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.22em] text-clay-500">{item.label}</p>
+          <p className="mt-2 text-2xl font-semibold text-clay-900">
+            {formatMacroValue(item.total)}
+            <span className="ml-2 text-sm font-medium text-clay-500">{item.unit}</span>
+          </p>
+        </div>
+        <span className="rounded-full border border-white/80 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-clay-600">
+          {item.goalType === "limit" ? "Stay under" : "Reach"}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm text-clay-500">{micronutrientGoalLabel(item)}</p>
+      <div className="mt-4 h-2 rounded-full bg-white/80">
+        <div
+          className={clsx("h-full rounded-full", barClasses)}
+          style={{ width: `${micronutrientProgressWidth(item)}%` }}
+        />
+      </div>
+      <p className="mt-3 text-sm font-medium text-clay-800">{status.detail}</p>
     </div>
   );
 }
@@ -1938,6 +2034,19 @@ export function MealTrackerApp() {
                         {rangeSummary(dashboard.remaining.fatG)}
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-clay-100 bg-white/70 p-5">
+                  <p className="section-label">Micronutrient Overview</p>
+                  <h3 className="mt-3 text-xl text-clay-900">Today&apos;s estimated intake</h3>
+                  <p className="mt-2 text-sm leading-6 text-clay-500">
+                    {dashboard.micronutrientOverview.note}
+                  </p>
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    {dashboard.micronutrientOverview.items.map((item) => (
+                      <MicronutrientOverviewCard key={item.key} item={item} />
+                    ))}
                   </div>
                 </div>
 

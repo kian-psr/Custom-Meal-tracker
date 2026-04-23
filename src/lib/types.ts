@@ -30,6 +30,22 @@ export type DailyTargets = {
   fatG: MacroRange;
 };
 
+export type MicronutrientGoalType = "minimum" | "limit";
+
+export type MicronutrientDailyGuideItem = {
+  key: keyof Micronutrients;
+  label: string;
+  unit: "g" | "mg" | "mcg";
+  total: number;
+  goal: number;
+  goalType: MicronutrientGoalType;
+};
+
+export type MicronutrientDailyOverview = {
+  note: string;
+  items: MicronutrientDailyGuideItem[];
+};
+
 export type AuthUser = {
   id: string;
   email: string;
@@ -170,6 +186,7 @@ export type DailyDashboard = {
   isToday: boolean;
   settings: UserSettingsRecord;
   totals: MacroTotals;
+  micronutrientOverview: MicronutrientDailyOverview;
   remaining: {
     calories: number;
     proteinG: number;

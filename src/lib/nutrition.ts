@@ -1,3 +1,4 @@
+import type { Micronutrients } from "@/lib/meal-analysis-schema";
 import type {
   CutStatus,
   DailyHistorySummary,
@@ -37,6 +38,50 @@ export function normalizeTotals(totals: MacroTotals): MacroTotals {
   };
 }
 
+export function sumMicronutrients(meals: MealLogRecord[]): Micronutrients {
+  return meals.reduce<Micronutrients>(
+    (totals, meal) => ({
+      sugarG: totals.sugarG + meal.micronutrients.sugarG,
+      fiberG: totals.fiberG + meal.micronutrients.fiberG,
+      sodiumMg: totals.sodiumMg + meal.micronutrients.sodiumMg,
+      potassiumMg: totals.potassiumMg + meal.micronutrients.potassiumMg,
+      calciumMg: totals.calciumMg + meal.micronutrients.calciumMg,
+      ironMg: totals.ironMg + meal.micronutrients.ironMg,
+      vitaminCMg: totals.vitaminCMg + meal.micronutrients.vitaminCMg,
+      vitaminAMcg: totals.vitaminAMcg + meal.micronutrients.vitaminAMcg,
+      vitaminDMcg: totals.vitaminDMcg + meal.micronutrients.vitaminDMcg,
+      vitaminB12Mcg: totals.vitaminB12Mcg + meal.micronutrients.vitaminB12Mcg,
+    }),
+    {
+      sugarG: 0,
+      fiberG: 0,
+      sodiumMg: 0,
+      potassiumMg: 0,
+      calciumMg: 0,
+      ironMg: 0,
+      vitaminCMg: 0,
+      vitaminAMcg: 0,
+      vitaminDMcg: 0,
+      vitaminB12Mcg: 0,
+    }
+  );
+}
+
+export function normalizeMicronutrients(totals: Micronutrients): Micronutrients {
+  return {
+    sugarG: roundToSingleDecimal(totals.sugarG),
+    fiberG: roundToSingleDecimal(totals.fiberG),
+    sodiumMg: roundToSingleDecimal(totals.sodiumMg),
+    potassiumMg: roundToSingleDecimal(totals.potassiumMg),
+    calciumMg: roundToSingleDecimal(totals.calciumMg),
+    ironMg: roundToSingleDecimal(totals.ironMg),
+    vitaminCMg: roundToSingleDecimal(totals.vitaminCMg),
+    vitaminAMcg: roundToSingleDecimal(totals.vitaminAMcg),
+    vitaminDMcg: roundToSingleDecimal(totals.vitaminDMcg),
+    vitaminB12Mcg: roundToSingleDecimal(totals.vitaminB12Mcg),
+  };
+}
+
 export function buildCutStatus(totals: MacroTotals, targets: DailyTargets): CutStatus {
   const reasons: string[] = [];
   const caloriesRemaining = targets.calories - totals.calories;
@@ -72,11 +117,7 @@ export function buildCutStatus(totals: MacroTotals, targets: DailyTargets): CutS
     };
   }
 
-  if (
-    totals.calories > targets.calories ||
-    totals.carbsG > targets.carbsG.max ||
-    totals.fatG > targets.fatG.max
-  ) {
+  if (totals.calories > targets.calories) {
     return {
       label: "Over target",
       tone: "alert",

@@ -2,6 +2,7 @@ import type { MealLog } from "@prisma/client";
 
 import { getDayRange, getDateKey, isToday, listDateKeysEndingAt } from "@/lib/date";
 import { deleteMealPhoto } from "@/lib/file-storage";
+import { buildMicronutrientDailyOverview } from "@/lib/micronutrient-goals";
 import {
   appendBreakdownReconciledAssumption,
   type AnalysisSource,
@@ -16,7 +17,9 @@ import {
   buildCutStatus,
   buildDailyHistorySummary,
   buildWeeklyTrend,
+  normalizeMicronutrients,
   normalizeTotals,
+  sumMicronutrients,
   sumMeals,
 } from "@/lib/nutrition";
 import { prisma } from "@/lib/prisma";
@@ -97,6 +100,7 @@ export async function getDailyDashboard(userId: string, dateKey?: string): Promi
 
   const selectedMeals = mealsByDate.get(range.key) ?? [];
   const totals = normalizeTotals(sumMeals(selectedMeals));
+  const micronutrientTotals = normalizeMicronutrients(sumMicronutrients(selectedMeals));
   const history = historyKeys.map((historyKey) =>
     buildDailyHistorySummary(historyKey, mealsByDate.get(historyKey) ?? [], targets)
   );
@@ -106,6 +110,7 @@ export async function getDailyDashboard(userId: string, dateKey?: string): Promi
     isToday: isToday(range.key),
     settings,
     totals,
+    micronutrientOverview: buildMicronutrientDailyOverview(micronutrientTotals),
     remaining: {
       calories: Math.round(targets.calories - totals.calories),
       proteinG: Math.max(0, Math.round((targets.proteinG - totals.proteinG) * 10) / 10),
