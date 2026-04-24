@@ -6,14 +6,24 @@ export const SUPPLEMENT_KEYS = [
   "ZINC",
   "IRON",
   "CALCIUM",
+  "MAGNESIUM",
   "VITAMIN_B12",
+  "OMEGA_3",
+  "ELECTROLYTES",
+  "MULTIVITAMIN",
   "CREATINE",
 ] as const;
 
-export const SUPPLEMENT_UNITS = ["MG", "MCG", "G", "IU"] as const;
+export const SUPPLEMENT_UNITS = ["MG", "MCG", "G", "IU", "SERVING"] as const;
+export const SUPPLEMENT_STACK_KEYS = [
+  "CUTTING_BASICS",
+  "MORNING_MICROS",
+  "TRAINING_SUPPORT",
+] as const;
 
 export type SupplementKey = (typeof SUPPLEMENT_KEYS)[number];
 export type SupplementUnit = (typeof SUPPLEMENT_UNITS)[number];
+export type SupplementStackKey = (typeof SUPPLEMENT_STACK_KEYS)[number];
 
 export type SupplementQuickDose = {
   amount: number;
@@ -36,6 +46,20 @@ export type SupplementDefinition = {
 export type SupplementImpact = {
   micronutrients: Micronutrients;
   creatineG: number;
+};
+
+export type SupplementStackItem = {
+  supplementKey: SupplementKey;
+  amount: number;
+  unit: SupplementUnit;
+  note?: string;
+};
+
+export type SupplementStackPreset = {
+  key: SupplementStackKey;
+  label: string;
+  description: string;
+  items: SupplementStackItem[];
 };
 
 function roundToSingleDecimal(value: number) {
@@ -128,6 +152,21 @@ export const SUPPLEMENT_CATALOG: SupplementDefinition[] = [
     category: "micronutrient",
   },
   {
+    key: "MAGNESIUM",
+    label: "Magnesium",
+    description: "Useful for glycinate, citrate, or other magnesium supplement doses.",
+    units: ["MG"],
+    defaultAmount: 200,
+    defaultUnit: "MG",
+    quickDoses: [
+      { amount: 200, unit: "MG", label: "200 mg" },
+      { amount: 300, unit: "MG", label: "300 mg" },
+      { amount: 400, unit: "MG", label: "400 mg" },
+    ],
+    trackingHint: "Counts toward your daily magnesium total.",
+    category: "micronutrient",
+  },
+  {
     key: "VITAMIN_B12",
     label: "Vitamin B12",
     description: "Handy for drops, tablets, or weekly B12 routines.",
@@ -139,6 +178,50 @@ export const SUPPLEMENT_CATALOG: SupplementDefinition[] = [
       { amount: 1000, unit: "MCG", label: "1000 mcg" },
     ],
     trackingHint: "Counts toward your daily B12 total.",
+    category: "micronutrient",
+  },
+  {
+    key: "OMEGA_3",
+    label: "Omega-3",
+    description: "Track fish oil, algae oil, or omega-3 capsules in milligrams or grams.",
+    units: ["MG", "G"],
+    defaultAmount: 1000,
+    defaultUnit: "MG",
+    quickDoses: [
+      { amount: 1000, unit: "MG", label: "1000 mg" },
+      { amount: 2, unit: "G", label: "2 g" },
+      { amount: 3, unit: "G", label: "3 g" },
+    ],
+    trackingHint: "Counts toward the omega-3 row in your daily overview.",
+    category: "micronutrient",
+  },
+  {
+    key: "ELECTROLYTES",
+    label: "Electrolytes",
+    description:
+      "For electrolyte powders or tablets when the label is not entered ingredient-by-ingredient.",
+    units: ["SERVING"],
+    defaultAmount: 1,
+    defaultUnit: "SERVING",
+    quickDoses: [
+      { amount: 1, unit: "SERVING", label: "1 serving" },
+      { amount: 2, unit: "SERVING", label: "2 servings" },
+    ],
+    trackingHint:
+      "Adds a typical electrolyte serving: sodium, potassium, and magnesium.",
+    category: "micronutrient",
+  },
+  {
+    key: "MULTIVITAMIN",
+    label: "Multivitamin",
+    description:
+      "A broad one-serving placeholder for a standard daily multivitamin. Edit individual entries if your label differs.",
+    units: ["SERVING"],
+    defaultAmount: 1,
+    defaultUnit: "SERVING",
+    quickDoses: [{ amount: 1, unit: "SERVING", label: "1 serving" }],
+    trackingHint:
+      "Adds a typical adult multivitamin blend across vitamins and minerals.",
     category: "micronutrient",
   },
   {
@@ -157,12 +240,110 @@ export const SUPPLEMENT_CATALOG: SupplementDefinition[] = [
   },
 ];
 
+export const SUPPLEMENT_STACK_PRESETS: SupplementStackPreset[] = [
+  {
+    key: "CUTTING_BASICS",
+    label: "Cutting basics",
+    description: "Vitamin D, magnesium, omega-3, and creatine in one tap.",
+    items: [
+      {
+        supplementKey: "VITAMIN_D",
+        amount: 25,
+        unit: "MCG",
+        note: "From Cutting basics stack.",
+      },
+      {
+        supplementKey: "MAGNESIUM",
+        amount: 200,
+        unit: "MG",
+        note: "From Cutting basics stack.",
+      },
+      {
+        supplementKey: "OMEGA_3",
+        amount: 1000,
+        unit: "MG",
+        note: "From Cutting basics stack.",
+      },
+      {
+        supplementKey: "CREATINE",
+        amount: 5,
+        unit: "G",
+        note: "From Cutting basics stack.",
+      },
+    ],
+  },
+  {
+    key: "MORNING_MICROS",
+    label: "Morning micros",
+    description: "Multivitamin, vitamin C, zinc, and B12 for a fast morning log.",
+    items: [
+      {
+        supplementKey: "MULTIVITAMIN",
+        amount: 1,
+        unit: "SERVING",
+        note: "From Morning micros stack.",
+      },
+      {
+        supplementKey: "VITAMIN_C",
+        amount: 500,
+        unit: "MG",
+        note: "From Morning micros stack.",
+      },
+      {
+        supplementKey: "ZINC",
+        amount: 15,
+        unit: "MG",
+        note: "From Morning micros stack.",
+      },
+      {
+        supplementKey: "VITAMIN_B12",
+        amount: 500,
+        unit: "MCG",
+        note: "From Morning micros stack.",
+      },
+    ],
+  },
+  {
+    key: "TRAINING_SUPPORT",
+    label: "Training support",
+    description: "Electrolytes, creatine, and omega-3 for training days.",
+    items: [
+      {
+        supplementKey: "ELECTROLYTES",
+        amount: 1,
+        unit: "SERVING",
+        note: "From Training support stack.",
+      },
+      {
+        supplementKey: "CREATINE",
+        amount: 5,
+        unit: "G",
+        note: "From Training support stack.",
+      },
+      {
+        supplementKey: "OMEGA_3",
+        amount: 1000,
+        unit: "MG",
+        note: "From Training support stack.",
+      },
+    ],
+  },
+];
+
+export const SUPPLEMENT_STACK_PRESETS_BY_KEY = Object.fromEntries(
+  SUPPLEMENT_STACK_PRESETS.map((preset) => [preset.key, preset])
+) as Record<SupplementStackKey, SupplementStackPreset>;
+
 export const SUPPLEMENT_CATALOG_BY_KEY = Object.fromEntries(
   SUPPLEMENT_CATALOG.map((definition) => [definition.key, definition])
 ) as Record<SupplementKey, SupplementDefinition>;
 
 export function getSupplementDefinition(key: SupplementKey) {
   return SUPPLEMENT_CATALOG_BY_KEY[key];
+}
+
+export function getSupplementStackPreset(key: SupplementStackKey) {
+  return SUPPLEMENT_STACK_PRESETS_BY_KEY[key];
 }
 
 export function isSupplementUnitAllowed(key: SupplementKey, unit: SupplementUnit) {
@@ -173,8 +354,27 @@ export function formatSupplementAmount(amount: number, unit: SupplementUnit) {
   const roundedAmount = Number.isInteger(amount)
     ? String(amount)
     : roundToSingleDecimal(amount).toFixed(1);
-  const label = unit === "MCG" ? "mcg" : unit === "MG" ? "mg" : unit === "G" ? "g" : "IU";
+  const label =
+    unit === "MCG"
+      ? "mcg"
+      : unit === "MG"
+        ? "mg"
+        : unit === "G"
+          ? "g"
+          : unit === "SERVING"
+            ? amount === 1
+              ? "serving"
+              : "servings"
+            : "IU";
   return `${roundedAmount} ${label}`;
+}
+
+function amountAsMg(amount: number, unit: SupplementUnit) {
+  if (unit === "G") {
+    return amount * 1000;
+  }
+
+  return unit === "MG" ? amount : 0;
 }
 
 export function deriveSupplementImpact(
@@ -205,9 +405,34 @@ export function deriveSupplementImpact(
       return buildImpact({
         calciumMg: normalizedAmount,
       });
+    case "MAGNESIUM":
+      return buildImpact({
+        magnesiumMg: normalizedAmount,
+      });
     case "VITAMIN_B12":
       return buildImpact({
         vitaminB12Mcg: normalizedAmount,
+      });
+    case "OMEGA_3":
+      return buildImpact({
+        omega3Mg: amountAsMg(normalizedAmount, unit),
+      });
+    case "ELECTROLYTES":
+      return buildImpact({
+        sodiumMg: normalizedAmount * 500,
+        potassiumMg: normalizedAmount * 200,
+        magnesiumMg: normalizedAmount * 60,
+      });
+    case "MULTIVITAMIN":
+      return buildImpact({
+        calciumMg: normalizedAmount * 200,
+        magnesiumMg: normalizedAmount * 50,
+        ironMg: normalizedAmount * 8,
+        zincMg: normalizedAmount * 11,
+        vitaminCMg: normalizedAmount * 90,
+        vitaminAMcg: normalizedAmount * 900,
+        vitaminDMcg: normalizedAmount * 20,
+        vitaminB12Mcg: normalizedAmount * 2.4,
       });
     case "CREATINE":
       return buildImpact({}, normalizedAmount);

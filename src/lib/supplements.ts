@@ -6,7 +6,9 @@ import {
   deriveSupplementImpact,
   formatSupplementAmount,
   getSupplementDefinition,
+  getSupplementStackPreset,
   type SupplementKey,
+  type SupplementStackKey,
   type SupplementUnit,
 } from "@/lib/supplement-catalog";
 import type { SupplementLogRecord, SupplementSummary } from "@/lib/types";
@@ -105,6 +107,30 @@ export async function createSupplementLog(input: {
   });
 
   return mapSupplementLogRecord(createdRecord);
+}
+
+export async function createSupplementStackLogs(input: {
+  userId: string;
+  stackKey: SupplementStackKey;
+  consumedAt: string;
+}) {
+  const preset = getSupplementStackPreset(input.stackKey);
+  const consumedAt = new Date(input.consumedAt);
+  const createdRecords = await prisma.$transaction(
+    preset.items.map((item) =>
+      prisma.supplementLog.create({
+        data: {
+          userId: input.userId,
+          ...buildSupplementLogPayload({
+            ...item,
+            consumedAt: consumedAt.toISOString(),
+          }),
+        },
+      })
+    )
+  );
+
+  return createdRecords.map(mapSupplementLogRecord);
 }
 
 export async function updateSupplementLog(

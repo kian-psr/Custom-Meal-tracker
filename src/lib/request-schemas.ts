@@ -15,6 +15,7 @@ import {
 } from "@/lib/meal-analysis-schema";
 import {
   SUPPLEMENT_KEYS,
+  SUPPLEMENT_STACK_KEYS,
   SUPPLEMENT_UNITS,
   getSupplementDefinition,
   isSupplementUnitAllowed,
@@ -32,6 +33,7 @@ const activityLevelSchema = z.enum(ACTIVITY_LEVELS);
 const goalPhaseSchema = z.enum(GOAL_PHASES);
 const macroPreferenceSchema = z.enum(MACRO_PREFERENCES);
 const supplementKeySchema = z.enum(SUPPLEMENT_KEYS);
+const supplementStackKeySchema = z.enum(SUPPLEMENT_STACK_KEYS);
 const supplementUnitSchema = z.enum(SUPPLEMENT_UNITS);
 
 export const authEmailSchema = z
@@ -112,6 +114,7 @@ function validateSupplementAmount(
     MG: 5000,
     MCG: 5000,
     IU: 50000,
+    SERVING: 10,
   } as const;
 
   if (value.amount > unitMaximums[value.unit]) {
@@ -130,6 +133,11 @@ export const createSupplementLogSchema = supplementCreateBaseSchema.superRefine(
 export const updateSupplementLogSchema = supplementCreateBaseSchema.superRefine(
   validateSupplementAmount
 );
+
+export const createSupplementStackSchema = z.object({
+  stackKey: supplementStackKeySchema,
+  consumedAt: isoDateTimeSchema,
+});
 
 export const updateSettingsSchema = z
   .object({

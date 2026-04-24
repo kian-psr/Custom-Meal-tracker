@@ -38,9 +38,11 @@ import {
 import type { MealType } from "@/lib/meal-analysis-schema";
 import {
   SUPPLEMENT_CATALOG,
+  SUPPLEMENT_STACK_PRESETS,
   formatSupplementAmount,
   getSupplementDefinition,
   type SupplementKey,
+  type SupplementStackKey,
   type SupplementUnit,
 } from "@/lib/supplement-catalog";
 import type {
@@ -116,8 +118,10 @@ const MICRONUTRIENT_FIELDS: Array<{
   { key: "sodiumMg", label: "Sodium", helper: "mg" },
   { key: "potassiumMg", label: "Potassium", helper: "mg" },
   { key: "calciumMg", label: "Calcium", helper: "mg" },
+  { key: "magnesiumMg", label: "Magnesium", helper: "mg" },
   { key: "ironMg", label: "Iron", helper: "mg" },
   { key: "zincMg", label: "Zinc", helper: "mg" },
+  { key: "omega3Mg", label: "Omega-3", helper: "mg" },
   { key: "vitaminCMg", label: "Vit C", helper: "mg" },
   { key: "vitaminAMcg", label: "Vit A", helper: "mcg" },
   { key: "vitaminDMcg", label: "Vit D", helper: "mcg" },
@@ -298,6 +302,10 @@ function supplementUnitLabel(unit: SupplementUnit) {
     return "g";
   }
 
+  if (unit === "SERVING") {
+    return "serving";
+  }
+
   return "IU";
 }
 
@@ -410,6 +418,15 @@ function normalizeSupplementDraft(
     consumedAt: current.consumedAt || dateTimeLocalForDay(selectedDate),
     note: current.note,
   };
+}
+
+function supplementStackItemLabel(
+  item: (typeof SUPPLEMENT_STACK_PRESETS)[number]["items"][number]
+) {
+  return `${getSupplementDefinition(item.supplementKey).label} ${formatSupplementAmount(
+    item.amount,
+    item.unit
+  )}`;
 }
 
 function createPlannerDraft(settings: UserSettingsRecord): PlannerDraft {
@@ -908,6 +925,8 @@ export function MealTrackerApp() {
     createSupplementDraft(getDateKey())
   );
   const [isSavingSupplement, setIsSavingSupplement] = useState(false);
+  const [busySupplementStackKey, setBusySupplementStackKey] =
+    useState<SupplementStackKey | null>(null);
   const [editingSupplementId, setEditingSupplementId] = useState<string | null>(null);
   const [supplementEditDraft, setSupplementEditDraft] = useState<SupplementDraft | null>(
     null
@@ -1331,6 +1350,42 @@ export function MealTrackerApp() {
       );
     } finally {
       setIsSavingSupplement(false);
+    }
+  }
+
+  async function handleSaveSupplementStack(stackKey: SupplementStackKey) {
+    setBusySupplementStackKey(stackKey);
+    setMutationError(null);
+
+    try {
+      const response = await fetch("/api/supplements/stacks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          stackKey,
+          consumedAt: new Date(dateTimeLocalForDay(selectedDate)).toISOString(),
+        }),
+      });
+
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      await loadDashboard(selectedDate);
+    } catch (error) {
+      setMutationError(
+        error instanceof Error ? error.message : "Unable to log the supplement stack."
+      );
+    } finally {
+      setBusySupplementStackKey(null);
     }
   }
 
@@ -2207,6 +2262,54 @@ export function MealTrackerApp() {
             <span className="rounded-full border border-clay-200 bg-clay-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-clay-600">
               Quick add
             </span>
+          </div>
+
+          <div className="mt-6 rounded-[28px] border border-sage-100 bg-sage-50/60 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="section-label">Daily Stack Presets</p>
+                <h3 className="mt-2 text-xl text-clay-900">Log a common supplement stack</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-clay-500">
+                  These presets create normal supplement entries, so you can edit or delete
+                  each item afterward and the micronutrient overview updates right away.
+                </p>
+              </div>
+              <span className="rounded-full border border-sage-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sage-800">
+                One tap
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              {SUPPLEMENT_STACK_PRESETS.map((stack) => (
+                <article
+                  className="rounded-[24px] border border-white/80 bg-white/75 p-4 shadow-sm"
+                  key={stack.key}
+                >
+                  <h4 className="text-lg font-semibold text-clay-900">{stack.label}</h4>
+                  <p className="mt-2 text-sm leading-6 text-clay-500">{stack.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {stack.items.map((item) => (
+                      <span
+                        className="rounded-full border border-clay-100 bg-clay-50 px-3 py-1 text-xs text-clay-600"
+                        key={`${stack.key}-${item.supplementKey}-${item.amount}-${item.unit}`}
+                      >
+                        {supplementStackItemLabel(item)}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    className="mt-4 w-full rounded-full bg-sage-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sage-800 disabled:cursor-not-allowed disabled:bg-sage-300"
+                    disabled={Boolean(busySupplementStackKey)}
+                    onClick={() => void handleSaveSupplementStack(stack.key)}
+                    type="button"
+                  >
+                    {busySupplementStackKey === stack.key
+                      ? "Logging stack..."
+                      : `Log ${stack.label}`}
+                  </button>
+                </article>
+              ))}
+            </div>
           </div>
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">

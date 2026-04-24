@@ -102,6 +102,12 @@ export async function getDailyDashboard(userId: string, dateKey?: string): Promi
 
   const selectedMeals = mealsByDate.get(range.key) ?? [];
   const selectedSupplements = await listDailySupplementLogs(userId, range.start, range.end);
+  const micronutrientGoalProfile = settings.planner?.profile
+    ? {
+        sex: settings.planner.profile.sex,
+        ageYears: settings.planner.profile.ageYears,
+      }
+    : null;
   const totals = normalizeTotals(sumMeals(selectedMeals));
   const micronutrientTotals = normalizeMicronutrients(
     addMicronutrientTotals(
@@ -118,7 +124,10 @@ export async function getDailyDashboard(userId: string, dateKey?: string): Promi
     isToday: isToday(range.key),
     settings,
     totals,
-    micronutrientOverview: buildMicronutrientDailyOverview(micronutrientTotals),
+    micronutrientOverview: buildMicronutrientDailyOverview(
+      micronutrientTotals,
+      micronutrientGoalProfile
+    ),
     supplementSummary: buildSupplementDailySummary(selectedSupplements),
     remaining: {
       calories: Math.round(targets.calories - totals.calories),
