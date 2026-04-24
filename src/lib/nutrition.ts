@@ -38,20 +38,28 @@ export function normalizeTotals(totals: MacroTotals): MacroTotals {
   };
 }
 
-export function sumMicronutrients(meals: MealLogRecord[]): Micronutrients {
-  return meals.reduce<Micronutrients>(
-    (totals, meal) => ({
-      sugarG: totals.sugarG + meal.micronutrients.sugarG,
-      fiberG: totals.fiberG + meal.micronutrients.fiberG,
-      sodiumMg: totals.sodiumMg + meal.micronutrients.sodiumMg,
-      potassiumMg: totals.potassiumMg + meal.micronutrients.potassiumMg,
-      calciumMg: totals.calciumMg + meal.micronutrients.calciumMg,
-      ironMg: totals.ironMg + meal.micronutrients.ironMg,
-      vitaminCMg: totals.vitaminCMg + meal.micronutrients.vitaminCMg,
-      vitaminAMcg: totals.vitaminAMcg + meal.micronutrients.vitaminAMcg,
-      vitaminDMcg: totals.vitaminDMcg + meal.micronutrients.vitaminDMcg,
-      vitaminB12Mcg: totals.vitaminB12Mcg + meal.micronutrients.vitaminB12Mcg,
-    }),
+export function addMicronutrientTotals(
+  current: Micronutrients,
+  addition: Micronutrients
+): Micronutrients {
+  return {
+    sugarG: current.sugarG + addition.sugarG,
+    fiberG: current.fiberG + addition.fiberG,
+    sodiumMg: current.sodiumMg + addition.sodiumMg,
+    potassiumMg: current.potassiumMg + addition.potassiumMg,
+    calciumMg: current.calciumMg + addition.calciumMg,
+    ironMg: current.ironMg + addition.ironMg,
+    zincMg: current.zincMg + addition.zincMg,
+    vitaminCMg: current.vitaminCMg + addition.vitaminCMg,
+    vitaminAMcg: current.vitaminAMcg + addition.vitaminAMcg,
+    vitaminDMcg: current.vitaminDMcg + addition.vitaminDMcg,
+    vitaminB12Mcg: current.vitaminB12Mcg + addition.vitaminB12Mcg,
+  };
+}
+
+export function sumMicronutrients<T extends { micronutrients: Micronutrients }>(records: T[]) {
+  return records.reduce<Micronutrients>(
+    (totals, record) => addMicronutrientTotals(totals, record.micronutrients),
     {
       sugarG: 0,
       fiberG: 0,
@@ -59,6 +67,7 @@ export function sumMicronutrients(meals: MealLogRecord[]): Micronutrients {
       potassiumMg: 0,
       calciumMg: 0,
       ironMg: 0,
+      zincMg: 0,
       vitaminCMg: 0,
       vitaminAMcg: 0,
       vitaminDMcg: 0,
@@ -75,6 +84,7 @@ export function normalizeMicronutrients(totals: Micronutrients): Micronutrients 
     potassiumMg: roundToSingleDecimal(totals.potassiumMg),
     calciumMg: roundToSingleDecimal(totals.calciumMg),
     ironMg: roundToSingleDecimal(totals.ironMg),
+    zincMg: roundToSingleDecimal(totals.zincMg),
     vitaminCMg: roundToSingleDecimal(totals.vitaminCMg),
     vitaminAMcg: roundToSingleDecimal(totals.vitaminAMcg),
     vitaminDMcg: roundToSingleDecimal(totals.vitaminDMcg),

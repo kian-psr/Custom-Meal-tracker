@@ -46,7 +46,7 @@ function buildPrompt(input: AnalyzeMealInput) {
     `Meal type: ${input.mealType}.`,
     `Description: ${input.description}.`,
     `Daily targets for context: ${input.targets.calories} kcal, ${input.targets.proteinG} g protein, ${input.targets.carbsG.min}-${input.targets.carbsG.max} g carbs, ${input.targets.fatG.min}-${input.targets.fatG.max} g fat.`,
-    "Estimate calories, macros, and best-effort micronutrients for the meal.",
+    "Estimate calories, macros, and best-effort micronutrients for the meal, including zinc.",
     "Use the daily targets only as context and never force the estimate to fit the goals.",
     "Be conservative with hidden oils, butter, cheese, sauces, sodium, and added sugar when they are plausible but unclear.",
     "Prioritize total calories and protein accuracy over micronutrient precision.",
@@ -108,7 +108,7 @@ async function analyzeWithOpenAI(input: AnalyzeMealInput): Promise<{
           {
             type: "input_text",
             text:
-              "You are a sports nutrition analyst estimating calories, macros, and best-effort micronutrients from a meal image plus a short ingredient description. Use the text to improve image understanding. Prioritize total calories and protein estimation accuracy, then carbs and fat, then micronutrients. Be conservative with hidden fats from oil, butter, cheese, dressings, sauces, and hidden sodium or added sugar when they are plausible but unclear. Never pretend to be exact. The micronutrients object must include realistic best-effort totals for sugar, fiber, sodium, potassium, calcium, iron, vitamin C, vitamin A, vitamin D, and vitamin B12. If the image does not support a confident vitamin estimate, stay modest rather than inventing a high number. The assumptions array must call out portion estimates, hidden ingredient risks, and ambiguity from the image. The estimated_components array should list the key ingredients that drove the estimate, use practical amount strings like 180 g chicken breast or 1 tsp olive oil, cover the whole meal rather than only a few ingredients, and add up closely to the total calories and macros returned.",
+              "You are a sports nutrition analyst estimating calories, macros, and best-effort micronutrients from a meal image plus a short ingredient description. Use the text to improve image understanding. Prioritize total calories and protein estimation accuracy, then carbs and fat, then micronutrients. Be conservative with hidden fats from oil, butter, cheese, dressings, sauces, and hidden sodium or added sugar when they are plausible but unclear. Never pretend to be exact. The micronutrients object must include realistic best-effort totals for sugar, fiber, sodium, potassium, calcium, iron, zinc, vitamin C, vitamin A, vitamin D, and vitamin B12. If the image does not support a confident vitamin or mineral estimate, stay modest rather than inventing a high number. The assumptions array must call out portion estimates, hidden ingredient risks, and ambiguity from the image. The estimated_components array should list the key ingredients that drove the estimate, use practical amount strings like 180 g chicken breast or 1 tsp olive oil, cover the whole meal rather than only a few ingredients, and add up closely to the total calories and macros returned.",
           },
         ],
       },

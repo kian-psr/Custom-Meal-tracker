@@ -14,6 +14,7 @@ import {
   reconcileEstimatedComponents,
 } from "@/lib/meal-analysis-schema";
 import {
+  addMicronutrientTotals,
   buildCutStatus,
   buildDailyHistorySummary,
   buildWeeklyTrend,
@@ -24,6 +25,7 @@ import {
 } from "@/lib/nutrition";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateUserSettings } from "@/lib/settings";
+import { buildSupplementDailySummary, listDailySupplementLogs } from "@/lib/supplements";
 import type { DailyDashboard, MealLogRecord } from "@/lib/types";
 
 function parseJson<T>(value: string): T {
@@ -99,8 +101,14 @@ export async function getDailyDashboard(userId: string, dateKey?: string): Promi
   }
 
   const selectedMeals = mealsByDate.get(range.key) ?? [];
+  const selectedSupplements = await listDailySupplementLogs(userId, range.start, range.end);
   const totals = normalizeTotals(sumMeals(selectedMeals));
-  const micronutrientTotals = normalizeMicronutrients(sumMicronutrients(selectedMeals));
+  const micronutrientTotals = normalizeMicronutrients(
+    addMicronutrientTotals(
+      sumMicronutrients(selectedMeals),
+      sumMicronutrients(selectedSupplements)
+    )
+  );
   const history = historyKeys.map((historyKey) =>
     buildDailyHistorySummary(historyKey, mealsByDate.get(historyKey) ?? [], targets)
   );
@@ -111,6 +119,7 @@ export async function getDailyDashboard(userId: string, dateKey?: string): Promi
     settings,
     totals,
     micronutrientOverview: buildMicronutrientDailyOverview(micronutrientTotals),
+    supplementSummary: buildSupplementDailySummary(selectedSupplements),
     remaining: {
       calories: Math.round(targets.calories - totals.calories),
       proteinG: Math.max(0, Math.round((targets.proteinG - totals.proteinG) * 10) / 10),
@@ -125,6 +134,7 @@ export async function getDailyDashboard(userId: string, dateKey?: string): Promi
     },
     status: buildCutStatus(totals, targets),
     meals: selectedMeals,
+    supplements: selectedSupplements,
     history,
     weeklyTrend: buildWeeklyTrend(history),
   };

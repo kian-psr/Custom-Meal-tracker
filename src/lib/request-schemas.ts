@@ -13,6 +13,12 @@ import {
   analysisSourceSchema,
   mealTypeSchema,
 } from "@/lib/meal-analysis-schema";
+import {
+  SUPPLEMENT_KEYS,
+  SUPPLEMENT_UNITS,
+  getSupplementDefinition,
+  isSupplementUnitAllowed,
+} from "@/lib/supplement-catalog";
 
 const isoDateTimeSchema = z
   .string()
@@ -25,6 +31,8 @@ const heightUnitSchema = z.enum(HEIGHT_UNITS);
 const activityLevelSchema = z.enum(ACTIVITY_LEVELS);
 const goalPhaseSchema = z.enum(GOAL_PHASES);
 const macroPreferenceSchema = z.enum(MACRO_PREFERENCES);
+const supplementKeySchema = z.enum(SUPPLEMENT_KEYS);
+const supplementUnitSchema = z.enum(SUPPLEMENT_UNITS);
 
 export const authEmailSchema = z
   .string()
@@ -78,6 +86,50 @@ export const updateMealLogSchema = z.object({
   assumptions: z.array(z.string().trim().min(1).max(180)).min(1).max(8),
   consumedAt: isoDateTimeSchema,
 });
+
+const supplementCreateBaseSchema = z.object({
+  supplementKey: supplementKeySchema,
+  amount: z.coerce.number().positive("Enter a dose greater than 0."),
+  unit: supplementUnitSchema,
+  note: z.string().trim().max(140).optional().or(z.literal("")),
+  consumedAt: isoDateTimeSchema,
+});
+
+function validateSupplementAmount(
+  value: z.infer<typeof supplementCreateBaseSchema>,
+  context: z.RefinementCtx
+) {
+  if (!isSupplementUnitAllowed(value.supplementKey, value.unit)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["unit"],
+      message: `${getSupplementDefinition(value.supplementKey).label} cannot be logged in ${value.unit.toLowerCase()}.`,
+    });
+  }
+
+  const unitMaximums = {
+    G: 50,
+    MG: 5000,
+    MCG: 5000,
+    IU: 50000,
+  } as const;
+
+  if (value.amount > unitMaximums[value.unit]) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["amount"],
+      message: "That dose looks unusually high for the selected unit. Double-check the value.",
+    });
+  }
+}
+
+export const createSupplementLogSchema = supplementCreateBaseSchema.superRefine(
+  validateSupplementAmount
+);
+
+export const updateSupplementLogSchema = supplementCreateBaseSchema.superRefine(
+  validateSupplementAmount
+);
 
 export const updateSettingsSchema = z
   .object({

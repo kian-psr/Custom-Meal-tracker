@@ -36,6 +36,13 @@ import {
   toDateTimeLocalValue,
 } from "@/lib/date";
 import type { MealType } from "@/lib/meal-analysis-schema";
+import {
+  SUPPLEMENT_CATALOG,
+  formatSupplementAmount,
+  getSupplementDefinition,
+  type SupplementKey,
+  type SupplementUnit,
+} from "@/lib/supplement-catalog";
 import type {
   AuthSessionResponse,
   AuthUser,
@@ -44,6 +51,7 @@ import type {
   GoalPlannerPreviewResponse,
   MealAnalysisResponse,
   MealLogRecord,
+  SupplementLogRecord,
   UserSettingsRecord,
 } from "@/lib/types";
 
@@ -109,6 +117,7 @@ const MICRONUTRIENT_FIELDS: Array<{
   { key: "potassiumMg", label: "Potassium", helper: "mg" },
   { key: "calciumMg", label: "Calcium", helper: "mg" },
   { key: "ironMg", label: "Iron", helper: "mg" },
+  { key: "zincMg", label: "Zinc", helper: "mg" },
   { key: "vitaminCMg", label: "Vit C", helper: "mg" },
   { key: "vitaminAMcg", label: "Vit A", helper: "mcg" },
   { key: "vitaminDMcg", label: "Vit D", helper: "mcg" },
@@ -144,6 +153,14 @@ type SettingsDraft = {
   carbsMaxG: string;
   fatMinG: string;
   fatMaxG: string;
+};
+
+type SupplementDraft = {
+  supplementKey: SupplementKey;
+  amount: string;
+  unit: SupplementUnit;
+  consumedAt: string;
+  note: string;
 };
 
 type PlannerDraft = {
@@ -252,6 +269,38 @@ function micronutrientGoalLabel(
   return `${prefix} ${operator} ${formatMacroValue(item.goal)} ${item.unit}`;
 }
 
+function supplementCategoryChipClasses(supplementKey: SupplementKey) {
+  return getSupplementDefinition(supplementKey).category === "performance"
+    ? "border-ember-200 bg-ember-50 text-ember-800"
+    : "border-sage-200 bg-sage-50 text-sage-800";
+}
+
+function supplementTrackingText(supplement: SupplementLogRecord) {
+  const definition = getSupplementDefinition(supplement.supplementKey);
+
+  if (supplement.creatineG > 0) {
+    return `${formatMacroValue(supplement.creatineG)} g creatine added to today's supplement total.`;
+  }
+
+  return definition.trackingHint;
+}
+
+function supplementUnitLabel(unit: SupplementUnit) {
+  if (unit === "MCG") {
+    return "mcg";
+  }
+
+  if (unit === "MG") {
+    return "mg";
+  }
+
+  if (unit === "G") {
+    return "g";
+  }
+
+  return "IU";
+}
+
 function timeLabel(isoString: string) {
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -308,6 +357,58 @@ function createSettingsDraft(settings: UserSettingsRecord): SettingsDraft {
     carbsMaxG: String(settings.targets.carbsG.max),
     fatMinG: String(settings.targets.fatG.min),
     fatMaxG: String(settings.targets.fatG.max),
+  };
+}
+
+function createSupplementDraft(
+  selectedDate: string,
+  supplementKey: SupplementKey = SUPPLEMENT_CATALOG[0].key
+): SupplementDraft {
+  const definition = getSupplementDefinition(supplementKey);
+  const defaultDose =
+    definition.quickDoses[0] ?? {
+      amount: definition.defaultAmount,
+      unit: definition.defaultUnit,
+      label: formatSupplementAmount(definition.defaultAmount, definition.defaultUnit),
+    };
+
+  return {
+    supplementKey,
+    amount: String(defaultDose.amount),
+    unit: defaultDose.unit,
+    consumedAt: dateTimeLocalForDay(selectedDate),
+    note: "",
+  };
+}
+
+function createSupplementEditDraft(supplement: SupplementLogRecord): SupplementDraft {
+  return {
+    supplementKey: supplement.supplementKey,
+    amount: String(supplement.amount),
+    unit: supplement.unit,
+    consumedAt: toDateTimeLocalValue(new Date(supplement.consumedAt)),
+    note: supplement.note ?? "",
+  };
+}
+
+function normalizeSupplementDraft(
+  current: SupplementDraft,
+  selectedDate: string,
+  supplementKey: SupplementKey
+) {
+  const definition = getSupplementDefinition(supplementKey);
+  const defaultDose =
+    definition.quickDoses[0] ?? {
+      amount: definition.defaultAmount,
+      unit: definition.defaultUnit,
+    };
+
+  return {
+    supplementKey,
+    amount: String(defaultDose.amount),
+    unit: defaultDose.unit,
+    consumedAt: current.consumedAt || dateTimeLocalForDay(selectedDate),
+    note: current.note,
   };
 }
 
@@ -803,6 +904,15 @@ export function MealTrackerApp() {
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
   const [busyMealId, setBusyMealId] = useState<string | null>(null);
+  const [supplementDraft, setSupplementDraft] = useState<SupplementDraft>(() =>
+    createSupplementDraft(getDateKey())
+  );
+  const [isSavingSupplement, setIsSavingSupplement] = useState(false);
+  const [editingSupplementId, setEditingSupplementId] = useState<string | null>(null);
+  const [supplementEditDraft, setSupplementEditDraft] = useState<SupplementDraft | null>(
+    null
+  );
+  const [busySupplementId, setBusySupplementId] = useState<string | null>(null);
 
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("guided");
@@ -851,6 +961,10 @@ export function MealTrackerApp() {
     setEditingMealId(null);
     setEditDraft(null);
     setBusyMealId(null);
+    setEditingSupplementId(null);
+    setSupplementEditDraft(null);
+    setBusySupplementId(null);
+    setSupplementDraft(createSupplementDraft(getDateKey()));
     setMutationError(null);
     setAnalysisError(null);
     setReviewDraft(null);
@@ -1026,6 +1140,13 @@ export function MealTrackerApp() {
     };
   }, [selectedImage]);
 
+  useEffect(() => {
+    setSupplementDraft((current) => ({
+      ...current,
+      consumedAt: dateTimeLocalForDay(selectedDate),
+    }));
+  }, [selectedDate]);
+
   async function handleAnalyzeMeal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAnalysisError(null);
@@ -1154,6 +1275,65 @@ export function MealTrackerApp() {
     }
   }
 
+  function updateSupplementSelection(nextKey: SupplementKey) {
+    setSupplementDraft((current) => normalizeSupplementDraft(current, selectedDate, nextKey));
+  }
+
+  function applySupplementQuickDose(amount: number, unit: SupplementUnit) {
+    setSupplementDraft((current) => ({
+      ...current,
+      amount: String(amount),
+      unit,
+    }));
+  }
+
+  async function handleSaveSupplement() {
+    const amount = Number(supplementDraft.amount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMutationError("Enter a supplement dose greater than 0 before saving.");
+      return;
+    }
+
+    setIsSavingSupplement(true);
+    setMutationError(null);
+
+    try {
+      const response = await fetch("/api/supplements", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          supplementKey: supplementDraft.supplementKey,
+          amount,
+          unit: supplementDraft.unit,
+          note: supplementDraft.note.trim(),
+          consumedAt: new Date(supplementDraft.consumedAt).toISOString(),
+        }),
+      });
+
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      setSupplementDraft(createSupplementDraft(selectedDate, supplementDraft.supplementKey));
+      await loadDashboard(selectedDate);
+    } catch (error) {
+      setMutationError(
+        error instanceof Error ? error.message : "Unable to save the supplement."
+      );
+    } finally {
+      setIsSavingSupplement(false);
+    }
+  }
+
   function startEditMeal(meal: MealLogRecord) {
     setEditingMealId(meal.id);
     setEditDraft(createEditDraft(meal));
@@ -1162,6 +1342,16 @@ export function MealTrackerApp() {
   function cancelEditing() {
     setEditingMealId(null);
     setEditDraft(null);
+  }
+
+  function startEditSupplement(supplement: SupplementLogRecord) {
+    setEditingSupplementId(supplement.id);
+    setSupplementEditDraft(createSupplementEditDraft(supplement));
+  }
+
+  function cancelSupplementEditing() {
+    setEditingSupplementId(null);
+    setSupplementEditDraft(null);
   }
 
   async function handleUpdateMeal(mealId: string) {
@@ -1247,6 +1437,89 @@ export function MealTrackerApp() {
       setMutationError(error instanceof Error ? error.message : "Unable to delete the meal.");
     } finally {
       setBusyMealId(null);
+    }
+  }
+
+  async function handleUpdateSupplement(supplementId: string) {
+    if (!supplementEditDraft) {
+      return;
+    }
+
+    setBusySupplementId(supplementId);
+    setMutationError(null);
+
+    try {
+      const response = await fetch(`/api/supplements/${supplementId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          supplementKey: supplementEditDraft.supplementKey,
+          amount: Number(supplementEditDraft.amount),
+          unit: supplementEditDraft.unit,
+          note: supplementEditDraft.note.trim(),
+          consumedAt: new Date(supplementEditDraft.consumedAt).toISOString(),
+        }),
+      });
+
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      cancelSupplementEditing();
+      await loadDashboard(selectedDate);
+    } catch (error) {
+      setMutationError(
+        error instanceof Error ? error.message : "Unable to update the supplement."
+      );
+    } finally {
+      setBusySupplementId(null);
+    }
+  }
+
+  async function handleDeleteSupplement(supplementId: string) {
+    const confirmed = window.confirm("Delete this supplement entry from the log?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setBusySupplementId(supplementId);
+    setMutationError(null);
+
+    try {
+      const response = await fetch(`/api/supplements/${supplementId}`, {
+        method: "DELETE",
+      });
+
+      if (response.status === 401) {
+        const message = await readErrorMessage(response);
+        handleSignedOut(message);
+        throw new Error(message);
+      }
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response));
+      }
+
+      if (editingSupplementId === supplementId) {
+        cancelSupplementEditing();
+      }
+
+      await loadDashboard(selectedDate);
+    } catch (error) {
+      setMutationError(
+        error instanceof Error ? error.message : "Unable to delete the supplement."
+      );
+    } finally {
+      setBusySupplementId(null);
     }
   }
 
@@ -1422,6 +1695,7 @@ export function MealTrackerApp() {
   const hasAnyLoggedMeals =
     dashboard?.history.some((summary) => summary.mealCount > 0) ?? false;
   const showFirstRunGuide = Boolean(sessionUser && dashboard && !hasAnyLoggedMeals);
+  const selectedSupplementDefinition = getSupplementDefinition(supplementDraft.supplementKey);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -1616,6 +1890,7 @@ export function MealTrackerApp() {
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <div className="space-y-6">
         <section className="glass-panel animate-rise p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -1918,6 +2193,192 @@ export function MealTrackerApp() {
           ) : null}
         </section>
 
+        <section className="glass-panel animate-rise p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="section-label">Supplement Log</p>
+              <h2 className="mt-3 text-2xl text-clay-900">Add vitamins, minerals, or creatine</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-clay-500">
+                Pick a supplement from the list, set the dose, and it will flow into the
+                daily micronutrient overview where it makes sense. Creatine is tracked as
+                its own daily total.
+              </p>
+            </div>
+            <span className="rounded-full border border-clay-200 bg-clay-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-clay-600">
+              Quick add
+            </span>
+          </div>
+
+          <div className="mt-6 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="rounded-[24px] border border-clay-100 bg-white/80 p-5">
+              <label className="block">
+                <span className="text-sm font-medium text-clay-700">Supplement</span>
+                <select
+                  className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                  onChange={(event) =>
+                    updateSupplementSelection(event.target.value as SupplementKey)
+                  }
+                  value={supplementDraft.supplementKey}
+                >
+                  {SUPPLEMENT_CATALOG.map((supplement) => (
+                    <option key={supplement.key} value={supplement.key}>
+                      {supplement.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <label className="block">
+                  <span className="text-sm font-medium text-clay-700">Dose</span>
+                  <input
+                    className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                    inputMode="decimal"
+                    onChange={(event) =>
+                      setSupplementDraft((current) => ({
+                        ...current,
+                        amount: event.target.value,
+                      }))
+                    }
+                    placeholder="0"
+                    value={supplementDraft.amount}
+                  />
+                </label>
+
+                <label className="block sm:min-w-32">
+                  <span className="text-sm font-medium text-clay-700">Unit</span>
+                  <select
+                    className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                    onChange={(event) =>
+                      setSupplementDraft((current) => ({
+                        ...current,
+                        unit: event.target.value as SupplementUnit,
+                      }))
+                    }
+                    value={supplementDraft.unit}
+                  >
+                    {selectedSupplementDefinition.units.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {supplementUnitLabel(unit)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {selectedSupplementDefinition.quickDoses.map((dose) => (
+                  <button
+                    key={`${dose.label}-${dose.amount}-${dose.unit}`}
+                    className="rounded-full border border-clay-200 bg-clay-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-clay-700 transition hover:border-clay-400 hover:bg-white"
+                    onClick={() => applySupplementQuickDose(dose.amount, dose.unit)}
+                    type="button"
+                  >
+                    {dose.label}
+                  </button>
+                ))}
+              </div>
+
+              <label className="mt-4 block">
+                <span className="text-sm font-medium text-clay-700">Log time</span>
+                <input
+                  className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                  onChange={(event) =>
+                    setSupplementDraft((current) => ({
+                      ...current,
+                      consumedAt: event.target.value,
+                    }))
+                  }
+                  type="datetime-local"
+                  value={supplementDraft.consumedAt}
+                />
+              </label>
+
+              <label className="mt-4 block">
+                <span className="text-sm font-medium text-clay-700">Optional note</span>
+                <input
+                  className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                  onChange={(event) =>
+                    setSupplementDraft((current) => ({
+                      ...current,
+                      note: event.target.value,
+                    }))
+                  }
+                  placeholder="Brand, capsule count, or reminder note"
+                  value={supplementDraft.note}
+                />
+              </label>
+
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  className="inline-flex items-center justify-center rounded-full bg-clay-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-clay-700 disabled:cursor-not-allowed disabled:bg-clay-300"
+                  disabled={isSavingSupplement}
+                  onClick={() => void handleSaveSupplement()}
+                  type="button"
+                >
+                  {isSavingSupplement ? "Saving supplement..." : "Add supplement"}
+                </button>
+
+                <p className="text-sm leading-6 text-clay-500">
+                  Vitamin and mineral supplements feed into the daily micronutrient cards
+                  automatically after saving.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-clay-100 bg-gradient-to-br from-white to-clay-50 p-5">
+              <p className="section-label">Selected Supplement</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span
+                  className={clsx(
+                    "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]",
+                    supplementCategoryChipClasses(selectedSupplementDefinition.key)
+                  )}
+                >
+                  {selectedSupplementDefinition.category === "performance"
+                    ? "Performance"
+                    : "Micronutrient"}
+                </span>
+                <span className="rounded-full border border-clay-200 bg-white px-3 py-1 text-xs text-clay-600">
+                  {selectedSupplementDefinition.trackingHint}
+                </span>
+              </div>
+              <h3 className="mt-4 text-2xl text-clay-900">
+                {selectedSupplementDefinition.label}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-clay-500">
+                {selectedSupplementDefinition.description}
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <MetricChip
+                  helper={supplementUnitLabel(supplementDraft.unit)}
+                  label="Selected Dose"
+                  value={supplementDraft.amount || "0"}
+                />
+                <MetricChip
+                  helper="entries today"
+                  label="Supplement Logs"
+                  value={String(dashboard?.supplementSummary.count ?? 0)}
+                />
+                <MetricChip
+                  helper="grams today"
+                  label="Creatine"
+                  value={formatMacroValue(dashboard?.supplementSummary.creatineG ?? 0)}
+                />
+                <MetricChip
+                  helper="allowed units"
+                  label="Dose Formats"
+                  value={selectedSupplementDefinition.units
+                    .map((unit) => supplementUnitLabel(unit))
+                    .join(" / ")}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+        </div>
+
         <aside className="space-y-6">
           <section className="glass-panel animate-rise p-5 sm:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2047,6 +2508,27 @@ export function MealTrackerApp() {
                     {dashboard.micronutrientOverview.items.map((item) => (
                       <MicronutrientOverviewCard key={item.key} item={item} />
                     ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-clay-100 bg-white/70 p-5">
+                  <p className="section-label">Supplement Summary</p>
+                  <h3 className="mt-3 text-xl text-clay-900">Logged extras for the day</h3>
+                  <p className="mt-2 text-sm leading-6 text-clay-500">
+                    Supplement vitamins and minerals are already folded into the
+                    micronutrient overview above. Creatine is tracked separately here.
+                  </p>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <MetricChip
+                      helper="supplement entries"
+                      label="Total Logs"
+                      value={String(dashboard.supplementSummary.count)}
+                    />
+                    <MetricChip
+                      helper="grams today"
+                      label="Creatine"
+                      value={formatMacroValue(dashboard.supplementSummary.creatineG)}
+                    />
                   </div>
                 </div>
 
@@ -2989,6 +3471,225 @@ export function MealTrackerApp() {
                     )}
                   </div>
                 </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="glass-panel animate-rise p-5 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="section-label">Supplement Library</p>
+            <h2 className="mt-3 text-2xl text-clay-900">
+              Supplements for {formatDisplayDate(selectedDate)}
+            </h2>
+          </div>
+          {dashboard ? (
+            <p className="text-sm text-clay-500">
+              {dashboard.supplements.length} supplement
+              {dashboard.supplements.length === 1 ? "" : "s"} on this day
+            </p>
+          ) : null}
+        </div>
+
+        {dashboard && dashboard.supplements.length === 0 ? (
+          <div className="mt-6 rounded-[24px] border border-dashed border-clay-200 bg-white/60 px-6 py-10 text-center text-sm text-clay-500">
+            <p className="text-base font-semibold text-clay-900">
+              No supplements logged for this day.
+            </p>
+            <p className="mt-3 leading-6">
+              Use the supplement picker above to add vitamins, minerals, or creatine and
+              keep them tied to the same daily dashboard as your meals.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="mt-6 space-y-4">
+          {dashboard?.supplements.map((supplement) => {
+            const definition = getSupplementDefinition(supplement.supplementKey);
+            const isEditingSupplement = editingSupplementId === supplement.id;
+
+            return (
+              <article
+                key={supplement.id}
+                className="rounded-[26px] border border-clay-100 bg-white/75 p-5"
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={clsx(
+                          "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]",
+                          supplementCategoryChipClasses(supplement.supplementKey)
+                        )}
+                      >
+                        {definition.category === "performance" ? "Performance" : "Micronutrient"}
+                      </span>
+                      <span className="rounded-full border border-clay-200 bg-white px-3 py-1 text-xs text-clay-500">
+                        {supplement.amountLabel}
+                      </span>
+                    </div>
+                    <h3 className="mt-4 text-2xl text-clay-900">{supplement.supplementLabel}</h3>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-clay-600">
+                      {supplementTrackingText(supplement)}
+                    </p>
+                    {supplement.note ? (
+                      <p className="mt-2 text-sm leading-6 text-clay-500">{supplement.note}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <div className="rounded-[20px] border border-clay-100 bg-clay-50/70 px-4 py-3 text-sm text-clay-500">
+                      Logged at {timeLabel(supplement.consumedAt)}
+                    </div>
+                    <button
+                      className="rounded-full border border-clay-200 bg-white px-4 py-2 text-sm font-medium text-clay-700 transition hover:border-clay-400"
+                      onClick={() => startEditSupplement(supplement)}
+                      type="button"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="rounded-full border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-400 disabled:cursor-not-allowed disabled:text-rose-300"
+                      disabled={busySupplementId === supplement.id}
+                      onClick={() => void handleDeleteSupplement(supplement.id)}
+                      type="button"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                {isEditingSupplement && supplementEditDraft ? (
+                  <div className="mt-5 rounded-[24px] border border-clay-200 bg-clay-50/70 p-5">
+                    <p className="section-label">Edit Supplement</p>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div className="space-y-4">
+                        <label className="block">
+                          <span className="text-sm font-medium text-clay-700">Supplement</span>
+                          <select
+                            className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                            onChange={(event) =>
+                              setSupplementEditDraft((current) =>
+                                current
+                                  ? normalizeSupplementDraft(
+                                      current,
+                                      selectedDate,
+                                      event.target.value as SupplementKey
+                                    )
+                                  : current
+                              )
+                            }
+                            value={supplementEditDraft.supplementKey}
+                          >
+                            {SUPPLEMENT_CATALOG.map((option) => (
+                              <option key={option.key} value={option.key}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                          <label className="block">
+                            <span className="text-sm font-medium text-clay-700">Dose</span>
+                            <input
+                              className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                              inputMode="decimal"
+                              onChange={(event) =>
+                                setSupplementEditDraft((current) =>
+                                  current
+                                    ? { ...current, amount: event.target.value }
+                                    : current
+                                )
+                              }
+                              value={supplementEditDraft.amount}
+                            />
+                          </label>
+
+                          <label className="block sm:min-w-32">
+                            <span className="text-sm font-medium text-clay-700">Unit</span>
+                            <select
+                              className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                              onChange={(event) =>
+                                setSupplementEditDraft((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        unit: event.target.value as SupplementUnit,
+                                      }
+                                    : current
+                                )
+                              }
+                              value={supplementEditDraft.unit}
+                            >
+                              {getSupplementDefinition(
+                                supplementEditDraft.supplementKey
+                              ).units.map((unit) => (
+                                <option key={unit} value={unit}>
+                                  {supplementUnitLabel(unit)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <label className="block">
+                          <span className="text-sm font-medium text-clay-700">Log time</span>
+                          <input
+                            className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                            onChange={(event) =>
+                              setSupplementEditDraft((current) =>
+                                current
+                                  ? { ...current, consumedAt: event.target.value }
+                                  : current
+                              )
+                            }
+                            type="datetime-local"
+                            value={supplementEditDraft.consumedAt}
+                          />
+                        </label>
+
+                        <label className="block">
+                          <span className="text-sm font-medium text-clay-700">Note</span>
+                          <input
+                            className="mt-2 w-full rounded-[18px] border border-clay-200 bg-white px-4 py-3 outline-none focus:border-ember-500"
+                            onChange={(event) =>
+                              setSupplementEditDraft((current) =>
+                                current ? { ...current, note: event.target.value } : current
+                              )
+                            }
+                            placeholder="Optional note"
+                            value={supplementEditDraft.note}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                      <button
+                        className="rounded-full bg-clay-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-clay-700 disabled:cursor-not-allowed disabled:bg-clay-300"
+                        disabled={busySupplementId === supplement.id}
+                        onClick={() => void handleUpdateSupplement(supplement.id)}
+                        type="button"
+                      >
+                        {busySupplementId === supplement.id
+                          ? "Saving changes..."
+                          : "Save changes"}
+                      </button>
+                      <button
+                        className="rounded-full border border-clay-200 bg-white px-5 py-3 text-sm font-semibold text-clay-700 transition hover:border-clay-400"
+                        onClick={cancelSupplementEditing}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </article>
             );
           })}

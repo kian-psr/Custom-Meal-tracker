@@ -10,6 +10,7 @@ import type {
   GoalPlannerRecommendation,
   SettingsMode,
 } from "@/lib/goal-planner";
+import type { SupplementKey, SupplementUnit } from "@/lib/supplement-catalog";
 
 export type MacroTotals = {
   calories: number;
@@ -44,6 +45,11 @@ export type MicronutrientDailyGuideItem = {
 export type MicronutrientDailyOverview = {
   note: string;
   items: MicronutrientDailyGuideItem[];
+};
+
+export type SupplementSummary = {
+  count: number;
+  creatineG: number;
 };
 
 export type AuthUser = {
@@ -158,6 +164,21 @@ export type MealLogRecord = {
   updatedAt: string;
 };
 
+export type SupplementLogRecord = {
+  id: string;
+  supplementKey: SupplementKey;
+  supplementLabel: string;
+  amount: number;
+  unit: SupplementUnit;
+  amountLabel: string;
+  note: string | null;
+  micronutrients: Micronutrients;
+  creatineG: number;
+  consumedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CutStatus = {
   label: string;
   tone: "good" | "warn" | "alert";
@@ -187,6 +208,7 @@ export type DailyDashboard = {
   settings: UserSettingsRecord;
   totals: MacroTotals;
   micronutrientOverview: MicronutrientDailyOverview;
+  supplementSummary: SupplementSummary;
   remaining: {
     calories: number;
     proteinG: number;
@@ -195,6 +217,7 @@ export type DailyDashboard = {
   };
   status: CutStatus;
   meals: MealLogRecord[];
+  supplements: SupplementLogRecord[];
   history: DailyHistorySummary[];
   weeklyTrend: WeeklyTrend;
 };

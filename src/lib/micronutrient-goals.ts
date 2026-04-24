@@ -20,6 +20,7 @@ const MICRONUTRIENT_GUIDES: MicronutrientGuideDefinition[] = [
   { key: "potassiumMg", label: "Potassium", unit: "mg", goal: 4700, goalType: "minimum" },
   { key: "calciumMg", label: "Calcium", unit: "mg", goal: 1300, goalType: "minimum" },
   { key: "ironMg", label: "Iron", unit: "mg", goal: 18, goalType: "minimum" },
+  { key: "zincMg", label: "Zinc", unit: "mg", goal: 11, goalType: "minimum" },
   { key: "vitaminCMg", label: "Vitamin C", unit: "mg", goal: 90, goalType: "minimum" },
   { key: "vitaminAMcg", label: "Vitamin A", unit: "mcg", goal: 900, goalType: "minimum" },
   { key: "vitaminDMcg", label: "Vitamin D", unit: "mcg", goal: 20, goalType: "minimum" },
@@ -44,7 +45,7 @@ export function buildMicronutrientDailyOverview(
 
   return {
     note:
-      "These daily guides use general FDA adult Daily Values. Sugar is shown against the added-sugars guide, while the estimator tracks total sugar, so treat that row as directional.",
+      "These daily guides use general FDA adult Daily Values. Logged supplements are included too. Sugar is shown against the added-sugars guide, while the estimator tracks total sugar, so treat that row as directional.",
     items,
   };
 }
